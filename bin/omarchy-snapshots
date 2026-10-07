@@ -1,0 +1,150 @@
+#!/usr/bin/env python3
+"""
+omarchy-snapshots: User-facing CLI tool for Omarchy Snapshots HUD.
+Allows inspecting, creating, and managing system snapshots from terminal or script.
+"""
+
+import sys
+import os
+import json
+import subprocess
+import argparse
+
+CORE_SCRIPT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "omarchy-snapshots-core")
+
+def run_core(args_list):
+    cmd = [CORE_SCRIPT] + args_list
+    res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    try:
+        return json.loads(res.stdout)
+    except Exception:
+        return {"ok": False, "error": res.stderr or res.stdout}
+
+def print_table(data):
+    if not data.get("ok"):
+        print(f"\033[1;31mError:\033[0m {data.get('error', 'Unknown error')}")
+        return
+
+    health = data.get("health", {})
+    storage = data.get("storage", {})
+    color = "\033[1;32m" if health.get("status") == "healthy" else "\033[1;33m"
+    reset = "\033[0m"
+
+    print(f"\n{color}● {health.get('label', 'Unknown')}{reset} — {health.get('reason', '')}")
+    print(f"Disk: {storage.get('fsAvailHuman', '0 B')} free of {storage.get('fsSizeHuman', '0 B')} ({storage.get('usedPercent', 0)}% used) | Limine Boot Sync: {'Active' if health.get('limineSyncActive') else 'Disabled'}")
+
+    if data.get("needsPermission"):
+        print(f"\n\033[1;33mNotice:\033[0m {data.get('permissionHint', 'Permission required.')}")
+        print("Run `omarchy-snapshots authorize` to grant non-root access.\n")
+
+    for cfg in data.get("configs", []):
+        snaps = cfg.get("snapshots", [])
+        print(f"\n\033[1;36mSubvolume:\033[0m {cfg.get('subvolume')} ({cfg.get('name')}) — {len(snaps)} snapshots")
+        if not snaps:
+            if not cfg.get("readable"):
+                print(f"  \033[0;31m[!] Unreadable: {cfg.get('error', 'No permission')}\033[0m")
+            else:
+                print("  No snapshots found.")
+            continue
+
+        print("┌──────┬───────────────┬─────────────────────┬──────────────┬───────────────────────────────┐")
+        print("│   ID │ AGE           │ DATE (UTC/LOCAL)    │ CLEANUP      │ DESCRIPTION                   │")
+        print("├──────┼───────────────┼─────────────────────┼──────────────┼───────────────────────────────┤")
+        for s in snaps:
+            pin_badge = " [📌]" if s.get("important") else ""
+            desc = s.get("description", "") + pin_badge
+            if len(desc) > 29:
+                desc = desc[:26] + "..."
+            print(f"│ {s.get('id'):>4} │ {s.get('relativeAge'):<13} │ {s.get('date', ''):<19} │ {s.get('cleanup', ''):<12} │ {desc:<29} │")
+        print("└──────┴───────────────┴─────────────────────┴──────────────┴───────────────────────────────┘")
+    print()
+
+def main():
+    parser = argparse.ArgumentParser(description="Omarchy Snapshots CLI")
+    parser.add_argument("command", nargs="?", default="list", choices=["list", "create", "delete", "pin", "unpin", "diff", "authorize", "json"], help="Command to run")
+    parser.add_argument("--desc", default="", help="Description for new snapshot")
+    parser.add_argument("--id", type=int, help="Snapshot ID")
+    parser.add_argument("--important", action="store_true", help="Pin snapshot against auto-cleanup")
+    parser.add_argument("--mock", action="store_true", help="Use mock data")
+
+    args = parser.parse_args()
+
+    if args.command in ["list", "status"]:
+        core_args = ["status"]
+        if args.mock:
+            core_args.append("--mock")
+        data = run_core(core_args)
+        print_table(data)
+    elif args.command == "json":
+        core_args = ["status"]
+        if args.mock:
+            core_args.append("--mock")
+        data = run_core(core_args)
+        print(json.dumps(data, indent=2))
+    elif args.command == "create":
+        core_args = ["create", "--desc", args.desc]
+        if args.important:
+            core_args.append("--important")
+        if args.mock:
+            core_args.append("--mock")
+        res = run_core(core_args)
+        if res.get("ok"):
+            print(f"\033[1;32m✓\033[0m {res.get('message', 'Snapshot created.')}")
+        else:
+            print(f"\033[1;31m✗\033[0m {res.get('error', 'Creation failed.')}")
+            sys.exit(1)
+    elif args.command == "delete":
+        if args.id is None:
+            print("Error: --id is required.")
+            sys.exit(1)
+        core_args = ["delete", "--id", str(args.id)]
+        if args.mock:
+            core_args.append("--mock")
+        res = run_core(core_args)
+        if res.get("ok"):
+            print(f"\033[1;32m✓\033[0m {res.get('message', 'Snapshot deleted.')}")
+        else:
+            print(f"\033[1;31m✗\033[0m {res.get('error', 'Delete failed.')}")
+            sys.exit(1)
+    elif args.command in ["pin", "unpin"]:
+        if args.id is None:
+            print("Error: --id is required.")
+            sys.exit(1)
+        core_args = [args.command, "--id", str(args.id)]
+        if args.mock:
+            core_args.append("--mock")
+        res = run_core(core_args)
+        if res.get("ok"):
+            print(f"\033[1;32m✓\033[0m {res.get('message')}")
+        else:
+            print(f"\033[1;31m✗\033[0m {res.get('error')}")
+            sys.exit(1)
+    elif args.command == "diff":
+        if args.id is None:
+            print("Error: --id is required.")
+            sys.exit(1)
+        core_args = ["diff", "--id", str(args.id)]
+        if args.mock:
+            core_args.append("--mock")
+        res = run_core(core_args)
+        if res.get("ok"):
+            summary = res.get("summary", {})
+            print(f"\n\033[1;36mDiff for Snapshot #{args.id} vs Current System:\033[0m")
+            print(f"Added: +{summary.get('added', 0)} | Modified: ~{summary.get('modified', 0)} | Deleted: -{summary.get('deleted', 0)}\n")
+            for f in res.get("files", []):
+                color = "\033[0;32m+" if f.get("status") == "added" else ("\033[0;31m-" if f.get("status") == "deleted" else "\033[0;33m~")
+                print(f"  {color} {f.get('status'):<8}\033[0m {f.get('path')}")
+            print()
+        else:
+            print(f"\033[1;31m✗\033[0m {res.get('error')}")
+            sys.exit(1)
+    elif args.command == "authorize":
+        res = run_core(["authorize"])
+        if res.get("ok"):
+            print(f"\033[1;32m✓\033[0m {res.get('message')}")
+        else:
+            print(f"\033[1;31m✗\033[0m {res.get('error')}")
+            sys.exit(1)
+
+if __name__ == "__main__":
+    main()

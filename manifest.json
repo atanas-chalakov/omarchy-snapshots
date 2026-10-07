@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "id": "ac.snapshots",
+  "name": "Snapshots & Recovery",
+  "version": "1.0.0",
+  "author": "Atanas Chalakov",
+  "description": "Visual Btrfs & Snapper snapshot manager and recovery HUD for Omarchy",
+  "kinds": [
+    "panel",
+    "bar-widget"
+  ],
+  "entryPoints": {
+    "panel": "SnapshotsHUD.qml",
+    "barWidget": "BarWidget.qml"
+  },
+  "barWidget": {
+    "displayName": "Snapshots & Recovery",
+    "description": "System snapshot health and recovery launcher",
+    "category": "System",
+    "defaultSection": "right",
+    "allowMultiple": false
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "id": "ac.snapshots",
+  "name": "Snapshots & Recovery",
+  "version": "1.0.0",
+  "description": "Visual Btrfs & Snapper snapshot manager and recovery HUD for Omarchy. View recovery points, inspect diffs, browse snapshot files, and verify bootloader sync.",
+  "author": "ac",
+  "category": "System",
+  "tags": [
+    "system",
+    "quickshell",
+    "snapper",
+    "btrfs",
+    "recovery"
+  ],
+  "entry": "SnapshotsHUD.qml"
+}

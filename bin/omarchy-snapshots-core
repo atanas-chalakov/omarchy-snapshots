@@ -1,0 +1,514 @@
+#!/usr/bin/env python3
+"""
+omarchy-snapshots-core: Backend CLI and status engine for Omarchy Snapshots HUD.
+Provides fast JSON serialization of Snapper snapshots, health checks,
+diff analysis, and execution runners with graceful fallback and mock modes.
+"""
+
+import sys
+import os
+import json
+import subprocess
+import argparse
+import time
+from datetime import datetime, timezone
+
+def run_cmd(cmd, timeout=5):
+    try:
+        res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=timeout)
+        return res.returncode, res.stdout.strip(), res.stderr.strip()
+    except Exception as e:
+        return 1, "", str(e)
+
+def run_privileged(cmd_args, timeout=30):
+    """Run privileged command using pkexec if not root, or directly if already root."""
+    if os.geteuid() == 0:
+        return run_cmd(cmd_args, timeout=timeout)
+    return run_cmd(["pkexec"] + cmd_args, timeout=timeout)
+
+def format_bytes(bytes_num):
+    if bytes_num is None or bytes_num < 0:
+        return "0 B"
+    for unit in ['B', 'KiB', 'MiB', 'GiB', 'TiB']:
+        if bytes_num < 1024.0:
+            return f"{bytes_num:.1f} {unit}"
+        bytes_num /= 1024.0
+    return f"{bytes_num:.1f} PiB"
+
+def format_relative_time(epoch_secs):
+    if not epoch_secs:
+        return "Unknown"
+    now = int(time.time())
+    diff = max(0, now - epoch_secs)
+    if diff < 60:
+        return f"{diff}s ago"
+    elif diff < 3600:
+        mins = diff // 60
+        return f"{mins}m ago"
+    elif diff < 86400:
+        hrs = diff // 3600
+        return f"{hrs}h ago"
+    elif diff < 604800:
+        days = diff // 86400
+        return f"{days}d ago"
+    else:
+        weeks = diff // 604800
+        return f"{weeks}w ago"
+
+def get_systemd_status(unit_name):
+    rc, out, _ = run_cmd(["systemctl", "is-active", unit_name])
+    return out == "active"
+
+def get_disk_usage(path):
+    rc, out, _ = run_cmd(["df", "-B1", "--output=pcent,size,avail", path])
+    if rc != 0 or not out:
+        return 0, 0, 0
+    lines = out.splitlines()
+    if len(lines) < 2:
+        return 0, 0, 0
+    parts = lines[1].split()
+    try:
+        pcent = int(parts[0].replace('%', ''))
+        size = int(parts[1])
+        avail = int(parts[2])
+        return pcent, size, avail
+    except Exception:
+        return 0, 0, 0
+
+def get_mock_status():
+    now = int(time.time())
+    return {
+        "ok": True,
+        "error": None,
+        "readable": True,
+        "needsPermission": False,
+        "permissionHint": None,
+        "health": {
+            "status": "healthy",
+            "label": "System Protected",
+            "reason": "Boot sync verified · Latest snapshot 2h ago",
+            "limineSyncActive": True,
+            "cleanupTimerActive": True,
+            "snapperdActive": True
+        },
+        "storage": {
+            "usedPercent": 46,
+            "fsSize": 107374182400,
+            "fsAvail": 57982058496,
+            "fsSizeHuman": "100.0 GiB",
+            "fsAvailHuman": "54.0 GiB",
+            "snapshotCount": 4
+        },
+        "configs": [
+            {
+                "name": "root",
+                "subvolume": "/",
+                "readable": True,
+                "error": None,
+                "snapshots": [
+                    {
+                        "id": 19,
+                        "type": "single",
+                        "description": "Pre-Update (omarchy 4.0.2)",
+                        "date": datetime.fromtimestamp(now - 7200).strftime("%Y-%m-%d %H:%M:%S"),
+                        "epoch": now - 7200,
+                        "relativeAge": "2h ago",
+                        "cleanup": "number",
+                        "important": False,
+                        "bootable": True,
+                        "userdata": {"description": "Pre-Update (omarchy 4.0.2)"}
+                    },
+                    {
+                        "id": 18,
+                        "type": "single",
+                        "description": "Before NVIDIA 560 Driver Install",
+                        "date": datetime.fromtimestamp(now - 86400).strftime("%Y-%m-%d %H:%M:%S"),
+                        "epoch": now - 86400,
+                        "relativeAge": "1d ago",
+                        "cleanup": "none",
+                        "important": True,
+                        "bootable": True,
+                        "userdata": {"important": "yes"}
+                    },
+                    {
+                        "id": 17,
+                        "type": "single",
+                        "description": "Pre-Update (omarchy 4.0.1)",
+                        "date": datetime.fromtimestamp(now - 259200).strftime("%Y-%m-%d %H:%M:%S"),
+                        "epoch": now - 259200,
+                        "relativeAge": "3d ago",
+                        "cleanup": "number",
+                        "important": False,
+                        "bootable": True,
+                        "userdata": {}
+                    },
+                    {
+                        "id": 16,
+                        "type": "single",
+                        "description": "Clean Baseline Install",
+                        "date": datetime.fromtimestamp(now - 604800).strftime("%Y-%m-%d %H:%M:%S"),
+                        "epoch": now - 604800,
+                        "relativeAge": "7d ago",
+                        "cleanup": "none",
+                        "important": True,
+                        "bootable": True,
+                        "userdata": {"important": "yes"}
+                    }
+                ]
+            }
+        ]
+    }
+
+def get_live_status():
+    limine_active = get_systemd_status("limine-snapper-sync.service")
+    cleanup_active = get_systemd_status("snapper-cleanup.timer")
+    snapperd_active = get_systemd_status("snapperd.service")
+
+    # Check snapper existence
+    rc, _, _ = run_cmd(["which", "snapper"])
+    if rc != 0:
+        return {
+            "ok": False,
+            "error": "Snapper is not installed on this system.",
+            "readable": False,
+            "needsPermission": False,
+            "health": {
+                "status": "error",
+                "label": "Snapper Missing",
+                "reason": "Snapper package not found",
+                "limineSyncActive": False,
+                "cleanupTimerActive": False,
+                "snapperdActive": False
+            },
+            "storage": {"usedPercent": 0, "fsSize": 0, "fsAvail": 0, "fsSizeHuman": "0 B", "fsAvailHuman": "0 B", "snapshotCount": 0},
+            "configs": []
+        }
+
+    # Query configs
+    rc, configs_raw, err = run_cmd(["snapper", "--jsonout", "list-configs"])
+    if rc != 0 or not configs_raw:
+        # Snapper might exist but has no configs or failed
+        return {
+            "ok": False,
+            "error": err or "Snapper reported no configurations.",
+            "readable": False,
+            "needsPermission": "permission" in err.lower(),
+            "permissionHint": "Run 'pkexec snapper -c root set-config ALLOW_GROUPS=wheel' to enable user access." if "permission" in err.lower() else None,
+            "health": {
+                "status": "error",
+                "label": "No Configs",
+                "reason": err or "No snapper configs found",
+                "limineSyncActive": limine_active,
+                "cleanupTimerActive": cleanup_active,
+                "snapperdActive": snapperd_active
+            },
+            "storage": {"usedPercent": 0, "fsSize": 0, "fsAvail": 0, "fsSizeHuman": "0 B", "fsAvailHuman": "0 B", "snapshotCount": 0},
+            "configs": []
+        }
+
+    try:
+        configs_json = json.loads(configs_raw)
+    except Exception as e:
+        configs_json = {}
+
+    configs_list = []
+    total_snapshots = 0
+    newest_epoch = 0
+    overall_readable = True
+    any_permission_needed = False
+    root_usage = (0, 0, 0)
+
+    # In snapper json output:
+    # {"configs": [{"config": "root", "subvolume": "/"}, ...]}
+    configs_entries = configs_json.get("configs", []) if isinstance(configs_json, dict) else []
+
+    for entry in configs_entries:
+        cfg_name = entry.get("config") or entry.get("name")
+        subvol = entry.get("subvolume", "/")
+        if not cfg_name:
+            continue
+
+        pcent, size, avail = get_disk_usage(subvol)
+        if cfg_name == "root" or not root_usage[1]:
+            root_usage = (pcent, size, avail)
+
+        # List snapshots for this config
+        list_rc, list_out, list_err = run_cmd(["snapper", "--jsonout", "-c", cfg_name, "list"])
+        cfg_readable = True
+        cfg_error = None
+        snapshots = []
+
+        if list_rc != 0 or not list_out:
+            cfg_readable = False
+            cfg_error = list_err or "Permission denied or failed to read snapshots"
+            overall_readable = False
+            if "permission" in cfg_error.lower():
+                any_permission_needed = True
+        else:
+            try:
+                data = json.loads(list_out)
+                # Structure: {"<config_name>": [{"number": 1, "date": "...", ...}]}
+                raw_snaps = data.get(cfg_name, []) if isinstance(data, dict) else []
+                for s in raw_snaps:
+                    snap_id = s.get("number")
+                    if snap_id == 0 or snap_id is None:
+                        # 0 is the current active subvolume, not a snapshot
+                        continue
+
+                    date_str = s.get("date", "")
+                    epoch = 0
+                    if date_str:
+                        try:
+                            # format: "2026-10-07 16:40:12"
+                            dt = datetime.strptime(date_str, "%Y-%m-%d %H:%M:%S")
+                            epoch = int(dt.timestamp())
+                        except Exception:
+                            epoch = int(time.time())
+
+                    if epoch > newest_epoch:
+                        newest_epoch = epoch
+
+                    userdata = s.get("userdata", {})
+                    important = (userdata.get("important") == "yes") or (s.get("cleanup") == "none")
+
+                    snapshots.append({
+                        "id": snap_id,
+                        "type": s.get("type", "single"),
+                        "description": s.get("description", "") or f"Snapshot #{snap_id}",
+                        "date": date_str,
+                        "epoch": epoch,
+                        "relativeAge": format_relative_time(epoch),
+                        "cleanup": s.get("cleanup", "number"),
+                        "important": important,
+                        "bootable": True, # On Omarchy, all root snapshots sync to Limine
+                        "userdata": userdata
+                    })
+
+                # Sort newest snapshot first
+                snapshots.sort(key=lambda x: x["id"], reverse=True)
+                total_snapshots += len(snapshots)
+            except Exception as e:
+                cfg_readable = False
+                cfg_error = str(e)
+                overall_readable = False
+
+        configs_list.append({
+            "name": cfg_name,
+            "subvolume": subvol,
+            "readable": cfg_readable,
+            "error": cfg_error,
+            "snapshots": snapshots
+        })
+
+    # Evaluate overall system health
+    health_status = "healthy"
+    health_label = "System Protected"
+    health_reason = "Boot sync verified · Snapshots current"
+
+    if any_permission_needed or not overall_readable:
+        health_status = "warning"
+        health_label = "Permission Required"
+        health_reason = "Grant desktop access to view & manage snapshots"
+    elif not limine_active:
+        health_status = "warning"
+        health_label = "Boot Sync Paused"
+        health_reason = "limine-snapper-sync service is not active"
+    elif total_snapshots == 0:
+        health_status = "warning"
+        health_label = "No Snapshots"
+        health_reason = "Zero system recovery points found on disk"
+    elif newest_epoch > 0 and (int(time.time()) - newest_epoch > 7 * 86400):
+        health_status = "warning"
+        health_label = "Snapshots Aging"
+        health_reason = f"Latest snapshot is {format_relative_time(newest_epoch)}"
+
+    return {
+        "ok": True,
+        "error": None,
+        "readable": overall_readable,
+        "needsPermission": any_permission_needed,
+        "permissionHint": "Run 'pkexec snapper -c root set-config ALLOW_GROUPS=wheel' to enable passwordless desktop access." if any_permission_needed else None,
+        "health": {
+            "status": health_status,
+            "label": health_label,
+            "reason": health_reason,
+            "limineSyncActive": limine_active,
+            "cleanupTimerActive": cleanup_active,
+            "snapperdActive": snapperd_active
+        },
+        "storage": {
+            "usedPercent": root_usage[0],
+            "fsSize": root_usage[1],
+            "fsAvail": root_usage[2],
+            "fsSizeHuman": format_bytes(root_usage[1]),
+            "fsAvailHuman": format_bytes(root_usage[2]),
+            "snapshotCount": total_snapshots
+        },
+        "configs": configs_list
+    }
+
+def create_snapshot(description, config="root", important=False, mock=False):
+    if mock:
+        return {"ok": True, "message": f"[Mock] Snapshot '{description}' created successfully."}
+
+    cmd = ["snapper", "-c", config, "create", "-c", "number", "-d", description]
+    if important:
+        cmd.extend(["-u", "important=yes"])
+
+    rc, out, err = run_cmd(cmd)
+    if rc != 0 and ("permission" in err.lower() or "must be root" in err.lower()):
+        # Try privileged
+        rc, out, err = run_privileged(cmd)
+
+    if rc == 0:
+        return {"ok": True, "message": f"Snapshot '{description}' created successfully."}
+    return {"ok": False, "error": err or "Failed to create snapshot."}
+
+def delete_snapshot(snap_id, config="root", mock=False):
+    if mock:
+        return {"ok": True, "message": f"[Mock] Snapshot #{snap_id} deleted."}
+
+    cmd = ["snapper", "-c", config, "delete", str(snap_id)]
+    rc, out, err = run_cmd(cmd)
+    if rc != 0 and ("permission" in err.lower() or "must be root" in err.lower()):
+        rc, out, err = run_privileged(cmd)
+
+    if rc == 0:
+        return {"ok": True, "message": f"Snapshot #{snap_id} deleted successfully."}
+    return {"ok": False, "error": err or f"Failed to delete snapshot #{snap_id}."}
+
+def pin_snapshot(snap_id, pin=True, config="root", mock=False):
+    if mock:
+        state = "pinned" if pin else "unpinned"
+        return {"ok": True, "message": f"[Mock] Snapshot #{snap_id} {state}."}
+
+    # Pinning in snapper is setting userdata important=yes and cleanup=none
+    val = "important=yes" if pin else "important="
+    cleanup_val = "none" if pin else "number"
+    cmd = ["snapper", "-c", config, "modify", "-c", cleanup_val, "-u", val, str(snap_id)]
+
+    rc, out, err = run_cmd(cmd)
+    if rc != 0 and ("permission" in err.lower() or "must be root" in err.lower()):
+        rc, out, err = run_privileged(cmd)
+
+    if rc == 0:
+        action = "pinned" if pin else "unpinned"
+        return {"ok": True, "message": f"Snapshot #{snap_id} successfully {action}."}
+    return {"ok": False, "error": err or f"Failed to update snapshot #{snap_id}."}
+
+def get_diff(snap_id, config="root", mock=False):
+    if mock:
+        return {
+            "ok": True,
+            "snapshotId": snap_id,
+            "summary": {"added": 3, "modified": 12, "deleted": 1},
+            "files": [
+                {"path": "/etc/pacman.d/mirrorlist", "status": "modified"},
+                {"path": "/etc/systemd/system/test.service", "status": "added"},
+                {"path": "/usr/lib/modules/6.11.2-arch1-1", "status": "added"},
+                {"path": "/usr/lib/modules/6.11.1-arch1-1", "status": "deleted"},
+                {"path": "/etc/hypr/hyprland.conf", "status": "modified"}
+            ]
+        }
+
+    # Snapper status <id>..0 gives changed files between snapshot and current subvolume
+    cmd = ["snapper", "-c", config, "status", f"{snap_id}..0"]
+    rc, out, err = run_cmd(cmd)
+    if rc != 0 and ("permission" in err.lower() or "must be root" in err.lower()):
+        rc, out, err = run_privileged(cmd)
+
+    if rc != 0:
+        return {"ok": False, "error": err or "Failed to compute snapshot diff."}
+
+    files = []
+    added = 0
+    modified = 0
+    deleted = 0
+
+    for line in out.splitlines():
+        if len(line) < 3:
+            continue
+        # Format: "+..... /path/to/file" or "c..... /path/to/file" or "-..... /path/to/file"
+        marker = line[0]
+        filepath = line.strip().split()[-1] if len(line.split()) > 1 else line[7:].strip()
+        status = "modified"
+        if marker == '+':
+            status = "added"
+            added += 1
+        elif marker == '-':
+            status = "deleted"
+            deleted += 1
+        else:
+            status = "modified"
+            modified += 1
+
+        files.append({"path": filepath, "status": status})
+
+    return {
+        "ok": True,
+        "snapshotId": snap_id,
+        "summary": {"added": added, "modified": modified, "deleted": deleted},
+        "files": files[:200] # limit to top 200 changes for fast rendering
+    }
+
+def authorize_access(config="root"):
+    """Grants the wheel group permissions in snapper config and /.snapshots permissions."""
+    # 1. snapper set-config ALLOW_GROUPS="wheel"
+    cmd1 = ["snapper", "-c", config, "set-config", "ALLOW_GROUPS=wheel"]
+    rc1, out1, err1 = run_privileged(cmd1)
+
+    # 2. chmod a+rx /.snapshots
+    cmd2 = ["chmod", "a+rx", "/.snapshots"]
+    rc2, out2, err2 = run_privileged(cmd2)
+
+    if rc1 == 0 and rc2 == 0:
+        return {"ok": True, "message": "Permissions granted! You can now view and create snapshots passwordlessly."}
+    return {"ok": False, "error": f"{err1} {err2}".strip()}
+
+def main():
+    parser = argparse.ArgumentParser(description="Omarchy Snapshots Backend Core")
+    parser.add_argument("command", choices=["status", "create", "delete", "pin", "unpin", "diff", "authorize"], help="Action to execute")
+    parser.add_argument("--mock", action="store_true", help="Output mock data for testing or preview")
+    parser.add_argument("--config", default="root", help="Snapper config name (default: root)")
+    parser.add_argument("--desc", default="", help="Description for snapshot creation")
+    parser.add_argument("--id", type=int, help="Snapshot ID for operations")
+    parser.add_argument("--important", action="store_true", help="Mark snapshot as important (pinned)")
+
+    args = parser.parse_args()
+
+    if args.command == "status":
+        res = get_mock_status() if args.mock else get_live_status()
+        print(json.dumps(res, indent=2))
+    elif args.command == "create":
+        desc = args.desc.strip() or f"Manual checkpoint {datetime.now().strftime('%Y-%m-%d %H:%M')}"
+        res = create_snapshot(desc, config=args.config, important=args.important, mock=args.mock)
+        print(json.dumps(res, indent=2))
+        sys.exit(0 if res.get("ok") else 1)
+    elif args.command == "delete":
+        if args.id is None:
+            print(json.dumps({"ok": False, "error": "--id is required for delete"}))
+            sys.exit(1)
+        res = delete_snapshot(args.id, config=args.config, mock=args.mock)
+        print(json.dumps(res, indent=2))
+        sys.exit(0 if res.get("ok") else 1)
+    elif args.command in ["pin", "unpin"]:
+        if args.id is None:
+            print(json.dumps({"ok": False, "error": "--id is required"}))
+            sys.exit(1)
+        res = pin_snapshot(args.id, pin=(args.command == "pin"), config=args.config, mock=args.mock)
+        print(json.dumps(res, indent=2))
+        sys.exit(0 if res.get("ok") else 1)
+    elif args.command == "diff":
+        if args.id is None:
+            print(json.dumps({"ok": False, "error": "--id is required for diff"}))
+            sys.exit(1)
+        res = get_diff(args.id, config=args.config, mock=args.mock)
+        print(json.dumps(res, indent=2))
+        sys.exit(0 if res.get("ok") else 1)
+    elif args.command == "authorize":
+        res = authorize_access(config=args.config)
+        print(json.dumps(res, indent=2))
+        sys.exit(0 if res.get("ok") else 1)
+
+if __name__ == "__main__":
+    main()
