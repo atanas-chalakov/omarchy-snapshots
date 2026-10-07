@@ -125,11 +125,14 @@ omarchy-snapshots json
 ## Running the Automated Test Suite
 
 ```bash
-# Run backend engine and CLI parser unit tests
-python3 -m unittest tests/test_core.py
+# Run the entire unified test suite (Validator, Unit Engine, CLI, QML, and IPC)
+./tests/run_all_tests.sh
 
-# Validate manifest against official Omarchy plugin schema
-omarchy plugin validate .
+# Or run individual test modules
+python3 -m unittest tests/test_unit_engine.py
+python3 -m unittest tests/test_cli_commands.py
+python3 -m unittest tests/test_qml_and_manifest.py
+python3 -m unittest tests/test_ipc_integration.py
 ```
 
 ---
