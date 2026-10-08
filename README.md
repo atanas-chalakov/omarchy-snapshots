@@ -57,8 +57,28 @@ Omarchy configures Btrfs and Snapper out-of-the-box, taking automatic snapshots 
   - Click **[Browse]** to open `/.snapshots/<id>/snapshot/` in your file manager to restore individual files without rebooting.
 - **One-Click Authorization**:
   - Built-in `[Authorize Access]` banner allows wheel users to configure passwordless desktop access via `pkexec` in seconds.
-- **Interactive Status Bar Widget**:
-  - Minimalist bar pill showing snapshot status glyph and active health badge. Left-click toggles the HUD; right-click opens the creation dialog.
+- **Full Keyboard Navigation & Shortcuts**:
+  - Complete keyboard control: browse snapshots, create checkpoints, inspect diffs, and restore with Vim-style and standard desktop hotkeys (`J/K`, `C`, `D`, `B`, `P`, `R`, `X`, `F`, `G`, `Esc`).
+
+---
+
+### Keyboard Shortcuts
+
+| Key | Action | Context |
+| :---: | :--- | :--- |
+| <kbd>J</kbd> / <kbd>↓</kbd> | Select next snapshot card | Timeline view |
+| <kbd>K</kbd> / <kbd>↑</kbd> | Select previous snapshot card | Timeline view |
+| <kbd>Home</kbd> / <kbd>End</kbd> | Jump to first / last snapshot | Timeline view |
+| <kbd>C</kbd> / <kbd>N</kbd> | Create new recovery checkpoint | Main HUD |
+| <kbd>D</kbd> / <kbd>Enter</kbd> | Inspect diff changes for selected snapshot | Main HUD |
+| <kbd>B</kbd> | Browse snapshot directory in file manager | Main HUD |
+| <kbd>P</kbd> | Toggle pin (retention protection `📌`) | Main HUD |
+| <kbd>R</kbd> | Stage rollback / restore to selected snapshot | Main HUD |
+| <kbd>X</kbd> / <kbd>Del</kbd> | Delete selected snapshot | Main HUD |
+| <kbd>F</kbd> / <kbd>/</kbd> | Focus search filter input | Main HUD |
+| <kbd>H</kbd> / <kbd>L</kbd> or <kbd>1</kbd>-<kbd>4</kbd> | Cycle filter pills (`All`, `Pre-Update`, `Manual`, `Pinned`) | Main HUD |
+| <kbd>G</kbd> | Refresh snapshot status | Main HUD |
+| <kbd>Esc</kbd> / <kbd>Q</kbd> | Dismiss active modal or close HUD | Any view |
 
 ---
 

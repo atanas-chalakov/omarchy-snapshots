@@ -110,6 +110,48 @@ class TestQmlAndManifest(unittest.TestCase):
         self.assertIn("showDiffModal", content)
         self.assertIn("showCreateModal", content)
         self.assertIn("showRestoreModal", content)
+        self.assertIn("showDeleteModal", content)
+
+    def test_keyboard_navigation_support(self):
+        hud_path = os.path.join(PROJECT_ROOT, "SnapshotsHUD.qml")
+        with open(hud_path, "r", encoding="utf-8") as f:
+            content = f.read()
+
+        # Selection state properties
+        self.assertIn("property int selectedIndex", content)
+        self.assertIn("readonly property var selectedSnapshot", content)
+        self.assertIn("function selectNext()", content)
+        self.assertIn("function selectPrev()", content)
+        self.assertIn("function cycleFilter(", content)
+
+        # Main key navigation bindings
+        self.assertIn("Keys.onPressed", content)
+        self.assertIn("Qt.Key_J", content)
+        self.assertIn("Qt.Key_K", content)
+        self.assertIn("Qt.Key_Down", content)
+        self.assertIn("Qt.Key_Up", content)
+        self.assertIn("Qt.Key_Home", content)
+        self.assertIn("Qt.Key_End", content)
+
+        # Snapshot actions shortcuts
+        self.assertIn("Qt.Key_C", content)
+        self.assertIn("Qt.Key_D", content)
+        self.assertIn("Qt.Key_B", content)
+        self.assertIn("Qt.Key_P", content)
+        self.assertIn("Qt.Key_R", content)
+        self.assertIn("Qt.Key_X", content)
+        self.assertIn("Qt.Key_F", content)
+        self.assertIn("Qt.Key_G", content)
+        self.assertIn("Qt.Key_Escape", content)
+        self.assertIn("Qt.Key_Q", content)
+
+        # Search field and modal key handlers
+        self.assertIn("createDescInput", content)
+        self.assertIn("restoreModalCard", content)
+        self.assertIn("deleteModalCard", content)
+
+        # Footer hint bar
+        self.assertIn("Keyboard Shortcuts Footer Hint Bar", content)
 
     def test_preview_image_valid(self):
         preview_path = os.path.join(PROJECT_ROOT, "preview.png")

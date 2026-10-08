@@ -24,6 +24,10 @@ Item {
   property var statusData: ({})
   property var snapshotsList: []
   property var filteredSnapshots: []
+  property int selectedIndex: 0
+  readonly property var selectedSnapshot: (selectedIndex >= 0 && selectedIndex < filteredSnapshots.length)
+    ? filteredSnapshots[selectedIndex]
+    : null
   property string currentFilter: "all" // "all", "update", "manual", "pinned"
   property string searchQuery: ""
   property bool isRefreshing: false
@@ -93,6 +97,39 @@ Item {
       result.push(item)
     }
     root.filteredSnapshots = result
+    if (result.length === 0) {
+      root.selectedIndex = -1
+    } else if (root.selectedIndex < 0 || root.selectedIndex >= result.length) {
+      root.selectedIndex = 0
+    }
+  }
+
+  function selectNext() {
+    if (filteredSnapshots.length === 0) return
+    if (selectedIndex < filteredSnapshots.length - 1) {
+      selectedIndex++
+    } else {
+      selectedIndex = 0
+    }
+    timelineView.positionViewAtIndex(selectedIndex, ListView.Contain)
+  }
+
+  function selectPrev() {
+    if (filteredSnapshots.length === 0) return
+    if (selectedIndex > 0) {
+      selectedIndex--
+    } else {
+      selectedIndex = filteredSnapshots.length - 1
+    }
+    timelineView.positionViewAtIndex(selectedIndex, ListView.Contain)
+  }
+
+  function cycleFilter(step) {
+    var filters = ["all", "update", "manual", "pinned"]
+    var idx = filters.indexOf(currentFilter)
+    if (idx === -1) idx = 0
+    var next = (idx + step + filters.length) % filters.length
+    currentFilter = filters[next]
   }
 
   onCurrentFilterChanged: applyFilter()
@@ -355,16 +392,158 @@ Item {
     minimumSize: Qt.size(620, 480)
     maximumSize: Qt.size(1400, 960)
 
+    onVisibleChanged: {
+      if (visible) {
+        Qt.callLater(function() { mainContainer.forceActiveFocus() })
+      }
+    }
+
     Item {
+      id: mainContainer
       anchors.fill: parent
       focus: true
 
-      Keys.onEscapePressed: {
-        if (root.showDiffModal) root.showDiffModal = false
-        else if (root.showCreateModal) root.showCreateModal = false
-        else if (root.showRestoreModal) root.showRestoreModal = false
-        else if (root.showDeleteModal) root.showDeleteModal = false
-        else root.dismiss()
+      Keys.onPressed: function(event) {
+        // If diff modal is open
+        if (root.showDiffModal) {
+          if (event.key === Qt.Key_Escape || event.key === Qt.Key_Q) {
+            root.showDiffModal = false
+            mainContainer.forceActiveFocus()
+            event.accepted = true
+          }
+          return
+        }
+
+        // If create modal is open
+        if (root.showCreateModal) {
+          if (event.key === Qt.Key_Escape) {
+            root.showCreateModal = false
+            mainContainer.forceActiveFocus()
+            event.accepted = true
+          }
+          return
+        }
+
+        // If restore modal is open
+        if (root.showRestoreModal) {
+          if (event.key === Qt.Key_Escape) {
+            root.showRestoreModal = false
+            mainContainer.forceActiveFocus()
+            event.accepted = true
+          } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+            root.executeRestore()
+            event.accepted = true
+          }
+          return
+        }
+
+        // If delete modal is open
+        if (root.showDeleteModal) {
+          if (event.key === Qt.Key_Escape) {
+            root.showDeleteModal = false
+            mainContainer.forceActiveFocus()
+            event.accepted = true
+          } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+            root.executeDelete()
+            event.accepted = true
+          }
+          return
+        }
+
+        // If search input has active focus
+        if (searchInput.activeFocus) {
+          if (event.key === Qt.Key_Escape) {
+            searchInput.text = ""
+            mainContainer.forceActiveFocus()
+            event.accepted = true
+          } else if (event.key === Qt.Key_Down || event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+            mainContainer.forceActiveFocus()
+            if (root.filteredSnapshots.length > 0) root.selectedIndex = 0
+            event.accepted = true
+          }
+          return
+        }
+
+        // Navigation
+        if (event.key === Qt.Key_J || event.key === Qt.Key_Down) {
+          root.selectNext()
+          event.accepted = true
+        } else if (event.key === Qt.Key_K || event.key === Qt.Key_Up) {
+          root.selectPrev()
+          event.accepted = true
+        } else if (event.key === Qt.Key_Home) {
+          if (root.filteredSnapshots.length > 0) {
+            root.selectedIndex = 0
+            timelineView.positionViewAtIndex(0, ListView.Contain)
+          }
+          event.accepted = true
+        } else if (event.key === Qt.Key_End) {
+          if (root.filteredSnapshots.length > 0) {
+            root.selectedIndex = root.filteredSnapshots.length - 1
+            timelineView.positionViewAtIndex(root.selectedIndex, ListView.Contain)
+          }
+          event.accepted = true
+        }
+        // Actions on selected snapshot
+        else if (event.key === Qt.Key_D || event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+          if (root.selectedSnapshot) {
+            root.inspectDiff(root.selectedSnapshot.id)
+            event.accepted = true
+          }
+        } else if (event.key === Qt.Key_B) {
+          if (root.selectedSnapshot) {
+            root.browseSnapshot(root.selectedSnapshot.id)
+            event.accepted = true
+          }
+        } else if (event.key === Qt.Key_P) {
+          if (root.selectedSnapshot) {
+            root.togglePin(root.selectedSnapshot.id, root.selectedSnapshot.important)
+            event.accepted = true
+          }
+        } else if (event.key === Qt.Key_R) {
+          if (root.selectedSnapshot) {
+            root.confirmRestore(root.selectedSnapshot)
+            event.accepted = true
+          }
+        } else if (event.key === Qt.Key_X || event.key === Qt.Key_Delete) {
+          if (root.selectedSnapshot) {
+            root.confirmDelete(root.selectedSnapshot)
+            event.accepted = true
+          }
+        }
+        // Global panel actions
+        else if (event.key === Qt.Key_C || event.key === Qt.Key_N) {
+          root.openCreateModal()
+          event.accepted = true
+        } else if (event.key === Qt.Key_F || event.key === Qt.Key_Slash) {
+          searchInput.forceActiveFocus()
+          searchInput.selectAll()
+          event.accepted = true
+        } else if (event.key === Qt.Key_G) {
+          root.refresh()
+          event.accepted = true
+        } else if (event.key === Qt.Key_H || event.key === Qt.Key_Left) {
+          root.cycleFilter(-1)
+          event.accepted = true
+        } else if (event.key === Qt.Key_L || event.key === Qt.Key_Right) {
+          root.cycleFilter(1)
+          event.accepted = true
+        } else if (event.key === Qt.Key_1) {
+          root.currentFilter = "all"
+          event.accepted = true
+        } else if (event.key === Qt.Key_2) {
+          root.currentFilter = "update"
+          event.accepted = true
+        } else if (event.key === Qt.Key_3) {
+          root.currentFilter = "manual"
+          event.accepted = true
+        } else if (event.key === Qt.Key_4) {
+          root.currentFilter = "pinned"
+          event.accepted = true
+        } else if (event.key === Qt.Key_Q || event.key === Qt.Key_Escape) {
+          root.dismiss()
+          event.accepted = true
+        }
       }
 
       ColumnLayout {
@@ -795,6 +974,18 @@ Item {
                 color: Color.foreground
                 clip: true
                 onTextChanged: root.searchQuery = text
+                Keys.onEscapePressed: {
+                  searchInput.text = ""
+                  mainContainer.forceActiveFocus()
+                }
+                Keys.onDownPressed: {
+                  mainContainer.forceActiveFocus()
+                  if (root.filteredSnapshots.length > 0) root.selectedIndex = 0
+                }
+                Keys.onReturnPressed: {
+                  mainContainer.forceActiveFocus()
+                  if (root.filteredSnapshots.length > 0) root.selectedIndex = 0
+                }
 
                 Text {
                   anchors.fill: parent
@@ -860,17 +1051,25 @@ Item {
 
             // Snapshot Item Card
             delegate: Rectangle {
+              readonly property bool isSelected: index === root.selectedIndex
               width: timelineView.width
               implicitHeight: cardLayout.implicitHeight + 20
               radius: 10
-              color: cardMouse.containsMouse ? Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.05) : Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.02)
-              border.color: modelData.important ? Qt.rgba(0.96, 0.62, 0.04, 0.4) : Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.08)
-              border.width: 1
+              color: isSelected
+                ? Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.12)
+                : (cardMouse.containsMouse ? Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.05) : Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.02))
+              border.color: isSelected
+                ? Color.accent
+                : (modelData.important ? Qt.rgba(0.96, 0.62, 0.04, 0.4) : Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.08))
+              border.width: isSelected ? 2 : 1
 
               MouseArea {
                 id: cardMouse
                 anchors.fill: parent
                 hoverEnabled: true
+                cursorShape: Qt.PointingHandCursor
+                onClicked: root.selectedIndex = index
+                onDoubleClicked: root.inspectDiff(modelData.id)
               }
 
               RowLayout {
@@ -1102,6 +1301,145 @@ Item {
             }
           }
         }
+
+        // Keyboard Shortcuts Footer Hint Bar
+        Rectangle {
+          Layout.fillWidth: true
+          implicitHeight: 30
+          radius: 6
+          color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.03)
+          border.color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.06)
+          border.width: 1
+
+          RowLayout {
+            anchors.fill: parent
+            anchors.leftMargin: 12
+            anchors.rightMargin: 12
+            spacing: 12
+
+            RowLayout {
+              spacing: 4
+              Rectangle {
+                implicitHeight: 18
+                implicitWidth: keyTxt1.implicitWidth + 8
+                radius: 4
+                color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.08)
+                Text { id: keyTxt1; anchors.centerIn: parent; text: "J/K"; font.pixelSize: 10; font.weight: Font.Bold; color: Color.foreground }
+              }
+              Text { text: "Select"; font.pixelSize: 10; color: Color.muted }
+            }
+
+            RowLayout {
+              spacing: 4
+              Rectangle {
+                implicitHeight: 18
+                implicitWidth: keyTxt2.implicitWidth + 8
+                radius: 4
+                color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.08)
+                Text { id: keyTxt2; anchors.centerIn: parent; text: "C"; font.pixelSize: 10; font.weight: Font.Bold; color: Color.foreground }
+              }
+              Text { text: "New"; font.pixelSize: 10; color: Color.muted }
+            }
+
+            RowLayout {
+              spacing: 4
+              Rectangle {
+                implicitHeight: 18
+                implicitWidth: keyTxt3.implicitWidth + 8
+                radius: 4
+                color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.08)
+                Text { id: keyTxt3; anchors.centerIn: parent; text: "D / ↵"; font.pixelSize: 10; font.weight: Font.Bold; color: Color.foreground }
+              }
+              Text { text: "Diff"; font.pixelSize: 10; color: Color.muted }
+            }
+
+            RowLayout {
+              spacing: 4
+              Rectangle {
+                implicitHeight: 18
+                implicitWidth: keyTxt4.implicitWidth + 8
+                radius: 4
+                color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.08)
+                Text { id: keyTxt4; anchors.centerIn: parent; text: "B"; font.pixelSize: 10; font.weight: Font.Bold; color: Color.foreground }
+              }
+              Text { text: "Browse"; font.pixelSize: 10; color: Color.muted }
+            }
+
+            RowLayout {
+              spacing: 4
+              Rectangle {
+                implicitHeight: 18
+                implicitWidth: keyTxt5.implicitWidth + 8
+                radius: 4
+                color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.08)
+                Text { id: keyTxt5; anchors.centerIn: parent; text: "P"; font.pixelSize: 10; font.weight: Font.Bold; color: Color.foreground }
+              }
+              Text { text: "Pin"; font.pixelSize: 10; color: Color.muted }
+            }
+
+            RowLayout {
+              spacing: 4
+              Rectangle {
+                implicitHeight: 18
+                implicitWidth: keyTxt6.implicitWidth + 8
+                radius: 4
+                color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.08)
+                Text { id: keyTxt6; anchors.centerIn: parent; text: "R"; font.pixelSize: 10; font.weight: Font.Bold; color: "#10B981" }
+              }
+              Text { text: "Restore"; font.pixelSize: 10; color: Color.muted }
+            }
+
+            RowLayout {
+              spacing: 4
+              Rectangle {
+                implicitHeight: 18
+                implicitWidth: keyTxt7.implicitWidth + 8
+                radius: 4
+                color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.08)
+                Text { id: keyTxt7; anchors.centerIn: parent; text: "X"; font.pixelSize: 10; font.weight: Font.Bold; color: Color.urgent }
+              }
+              Text { text: "Delete"; font.pixelSize: 10; color: Color.muted }
+            }
+
+            RowLayout {
+              spacing: 4
+              Rectangle {
+                implicitHeight: 18
+                implicitWidth: keyTxt8.implicitWidth + 8
+                radius: 4
+                color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.08)
+                Text { id: keyTxt8; anchors.centerIn: parent; text: "F"; font.pixelSize: 10; font.weight: Font.Bold; color: Color.foreground }
+              }
+              Text { text: "Filter"; font.pixelSize: 10; color: Color.muted }
+            }
+
+            RowLayout {
+              spacing: 4
+              Rectangle {
+                implicitHeight: 18
+                implicitWidth: keyTxt9.implicitWidth + 8
+                radius: 4
+                color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.08)
+                Text { id: keyTxt9; anchors.centerIn: parent; text: "G"; font.pixelSize: 10; font.weight: Font.Bold; color: Color.foreground }
+              }
+              Text { text: "Refresh"; font.pixelSize: 10; color: Color.muted }
+            }
+
+            Item { Layout.fillWidth: true }
+
+            RowLayout {
+              spacing: 4
+              Rectangle {
+                implicitHeight: 18
+                implicitWidth: keyTxt10.implicitWidth + 8
+                radius: 4
+                color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.08)
+                Text { id: keyTxt10; anchors.centerIn: parent; text: "Esc / Q"; font.pixelSize: 10; font.weight: Font.Bold; color: Color.foreground }
+              }
+              Text { text: "Close"; font.pixelSize: 10; color: Color.muted }
+            }
+          }
+        }
       }
 
       // ==========================================
@@ -1223,6 +1561,7 @@ Item {
                 onAccepted: root.submitCreateSnapshot()
                 Keys.onReturnPressed: root.submitCreateSnapshot()
                 Keys.onEnterPressed: root.submitCreateSnapshot()
+                Keys.onEscapePressed: root.showCreateModal = false
 
                 Text {
                   anchors.fill: parent
@@ -1512,6 +1851,7 @@ Item {
         }
 
         Rectangle {
+          id: restoreModalCard
           anchors.centerIn: parent
           width: 500
           implicitHeight: restoreCol.implicitHeight + 40
@@ -1612,6 +1952,7 @@ Item {
         }
 
         Rectangle {
+          id: deleteModalCard
           anchors.centerIn: parent
           width: 440
           implicitHeight: deleteCol.implicitHeight + 40
@@ -1619,6 +1960,11 @@ Item {
           color: Color.background
           border.color: Color.urgent
           border.width: 1
+          focus: root.showDeleteModal
+
+          Keys.onEscapePressed: root.showDeleteModal = false
+          Keys.onReturnPressed: root.executeDelete()
+          Keys.onEnterPressed: root.executeDelete()
 
           MouseArea { anchors.fill: parent }
 
