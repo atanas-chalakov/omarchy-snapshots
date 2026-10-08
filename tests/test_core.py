@@ -153,6 +153,19 @@ class TestSnapshotsCore(unittest.TestCase):
         self.assertEqual(res.get("prunedIds"), [16, 15, 14])
         self.assertIn("freedHuman", res)
 
+    def test_mock_boot_health(self):
+        res = self.run_core(["boot-health", "--mock"])
+        self.assertTrue(res.get("ok"))
+        self.assertEqual(res.get("bootloader"), "Limine")
+        self.assertTrue(res.get("daemonActive"))
+        self.assertEqual(res.get("totalEntries"), 4)
+        self.assertEqual(len(res.get("entries", [])), 4)
+
+    def test_mock_boot_sync(self):
+        res = self.run_core(["boot-sync", "--mock"])
+        self.assertTrue(res.get("ok"))
+        self.assertIn("Simulated Limine bootloader sync", res.get("message", ""))
+
     def test_user_cli_list(self):
         res = subprocess.run([CLI_BIN, "list", "--mock"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
         self.assertEqual(res.returncode, 0)

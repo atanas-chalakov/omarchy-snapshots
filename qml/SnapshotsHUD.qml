@@ -57,6 +57,10 @@ Item {
   property var activeOptimizeData: null
   property bool isOptimizing: false
 
+  property bool showBootModal: false
+  property var activeBootData: null
+  property bool isSyncingBoot: false
+
   function notify(msg) {
     statusNotification = msg
     notifyTimer.restart()
@@ -280,6 +284,27 @@ Item {
     executeOptimizeProcess.running = true
   }
 
+  function openBootModal() {
+    showBootModal = true
+    notify("Querying Limine bootloader health and verified entries...")
+    var args = [coreScript, "boot-health"]
+    if (useMockData) args.push("--mock")
+    if (bootHealthProcess.running) bootHealthProcess.running = false
+    bootHealthProcess.command = args
+    bootHealthProcess.running = true
+  }
+
+  function executeBootSync() {
+    if (isSyncingBoot) return
+    isSyncingBoot = true
+    notify("Synchronizing Limine bootloader entries with Snapper snapshots...")
+    var args = [coreScript, "boot-sync"]
+    if (useMockData) args.push("--mock")
+    if (bootSyncProcess.running) bootSyncProcess.running = false
+    bootSyncProcess.command = args
+    bootSyncProcess.running = true
+  }
+
   function authorizeAccess() {
     notify("Requesting authorization for passwordless access...")
     authProcess.command = [coreScript, "authorize"]
@@ -297,6 +322,7 @@ Item {
         if (parsed.mock === true) root.useMockData = true
         if (parsed.action === "create") root.openCreateModal(parsed.desc || "")
         if (parsed.action === "optimize") root.openOptimizeModal()
+        if (parsed.action === "boot") root.openBootModal()
         if (parsed.action === "diff") {
           Qt.callLater(function() { root.inspectDiff(parsed.id || 19) })
         }
@@ -499,6 +525,44 @@ Item {
   }
 
   Process {
+    id: bootHealthProcess
+    stdout: StdioCollector {
+      waitForEnd: true
+      onStreamFinished: {
+        try {
+          var res = JSON.parse(text)
+          if (res.ok) {
+            root.activeBootData = res
+          }
+        } catch(e) {}
+      }
+    }
+  }
+
+  Process {
+    id: bootSyncProcess
+    stdout: StdioCollector {
+      waitForEnd: true
+      onStreamFinished: {
+        root.isSyncingBoot = false
+        try {
+          var res = JSON.parse(text)
+          if (res.ok) {
+            root.notify(res.message || "Limine bootloader entries synchronized!")
+            root.openBootModal()
+            root.refresh()
+          } else {
+            root.notify("Boot sync failed: " + (res.error || "Failed"))
+          }
+        } catch(e) {
+          root.notify("Limine sync completed.")
+          root.refresh()
+        }
+      }
+    }
+  }
+
+  Process {
     id: windowFocusProcess
     command: ["hyprctl", "dispatch", "hl.dsp.focus({ window = \"title:Snapshots & Recovery\" })"]
   }
@@ -618,6 +682,12 @@ Item {
           } else if (event.key === Qt.Key_O) {
             root.openOptimizeModal()
             event.accepted = true
+          } else if (event.key === Qt.Key_L) {
+            root.openBootModal()
+            event.accepted = true
+          } else if (event.key === Qt.Key_S) {
+            if (root.showBootModal) root.executeBootSync()
+            event.accepted = true
           } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
             if (root.showRestoreModal) {
               root.executeRestore()
@@ -627,6 +697,8 @@ Item {
               root.executeRestoreFile()
             } else if (root.showOptimizeModal) {
               root.executeOptimize()
+            } else if (root.showBootModal) {
+              root.executeBootSync()
             } else if (root.selectedSnapshot) {
               root.inspectDiff(root.selectedSnapshot.id)
             }
@@ -649,6 +721,9 @@ Item {
               keyCatcher.forceActiveFocus()
             } else if (root.showOptimizeModal) {
               root.showOptimizeModal = false
+              keyCatcher.forceActiveFocus()
+            } else if (root.showBootModal) {
+              root.showBootModal = false
               keyCatcher.forceActiveFocus()
             } else {
               root.dismiss()
@@ -699,6 +774,15 @@ Item {
           } else if (root.showDeleteModal) {
             root.showDeleteModal = false
             keyCatcher.forceActiveFocus()
+          } else if (root.showRestoreFileModal) {
+            root.showRestoreFileModal = false
+            keyCatcher.forceActiveFocus()
+          } else if (root.showOptimizeModal) {
+            root.showOptimizeModal = false
+            keyCatcher.forceActiveFocus()
+          } else if (root.showBootModal) {
+            root.showBootModal = false
+            keyCatcher.forceActiveFocus()
           } else if (searchInput && searchInput.text.length > 0) {
             searchInput.text = ""
             keyCatcher.forceActiveFocus()
@@ -728,6 +812,12 @@ Item {
           } else if (k === "r") {
             if (root.showRestoreModal) root.executeRestore()
             else if (root.selectedSnapshot) root.confirmRestore(root.selectedSnapshot)
+          } else if (k === "l") {
+            root.openBootModal()
+          } else if (k === "s") {
+            if (root.showBootModal) root.executeBootSync()
+          } else if (k === "o") {
+            root.openOptimizeModal()
           } else if (k === "f" || key === "/") {
             searchInput.forceActiveFocus()
             searchInput.selectAll()
@@ -745,6 +835,15 @@ Item {
               keyCatcher.forceActiveFocus()
             } else if (root.showDeleteModal) {
               root.showDeleteModal = false
+              keyCatcher.forceActiveFocus()
+            } else if (root.showRestoreFileModal) {
+              root.showRestoreFileModal = false
+              keyCatcher.forceActiveFocus()
+            } else if (root.showOptimizeModal) {
+              root.showOptimizeModal = false
+              keyCatcher.forceActiveFocus()
+            } else if (root.showBootModal) {
+              root.showBootModal = false
               keyCatcher.forceActiveFocus()
             } else {
               root.dismiss()
@@ -1161,19 +1260,55 @@ Item {
               }
             }
 
-            // Bootloader Sync Status
-            RowLayout {
-              spacing: 6
+            // Interactive Limine Bootloader Health Button Chip
+            Rectangle {
+              id: limineBootBtn
+              implicitHeight: 26
+              implicitWidth: limineBtnRow.implicitWidth + 14
+              radius: 6
               property bool syncActive: (root.statusData && root.statusData.health && root.statusData.health.limineSyncActive) === true
-              Text {
-                text: parent.syncActive ? "󰌢" : "󰌣"
-                font.pixelSize: 14
-                color: parent.syncActive ? "#10B981" : "#EF4444"
+              color: limineBtnMouse.containsMouse ? (syncActive ? Qt.rgba(0.06, 0.72, 0.51, 0.22) : Qt.rgba(0.94, 0.27, 0.27, 0.22)) : (syncActive ? Qt.rgba(0.06, 0.72, 0.51, 0.12) : Qt.rgba(0.94, 0.27, 0.27, 0.12))
+              border.color: limineBtnMouse.containsMouse ? (syncActive ? "#10B981" : "#EF4444") : (syncActive ? Qt.rgba(0.06, 0.72, 0.51, 0.3) : Qt.rgba(0.94, 0.27, 0.27, 0.3))
+              border.width: 1
+
+              MouseArea {
+                id: limineBtnMouse
+                anchors.fill: parent
+                hoverEnabled: true
+                cursorShape: Qt.PointingHandCursor
+                onClicked: root.openBootModal()
               }
-              Text {
-                text: parent.syncActive ? "Limine Boot Sync Active" : "Boot Sync Offline"
-                font.pixelSize: 11
-                color: parent.syncActive ? Color.muted : "#EF4444"
+
+              RowLayout {
+                id: limineBtnRow
+                anchors.centerIn: parent
+                spacing: 5
+
+                Text {
+                  text: limineBootBtn.syncActive ? "󰌢" : "󰌣"
+                  font.pixelSize: 12
+                  color: limineBootBtn.syncActive ? "#10B981" : "#EF4444"
+                }
+                Text {
+                  text: limineBootBtn.syncActive ? "Limine Boot Sync" : "Boot Sync Offline"
+                  font.pixelSize: 11
+                  font.weight: Font.Medium
+                  color: limineBootBtn.syncActive ? Color.foreground : "#EF4444"
+                }
+                Rectangle {
+                  implicitHeight: 15
+                  implicitWidth: limineKeyTxt.implicitWidth + 6
+                  radius: 3
+                  color: limineBootBtn.syncActive ? Qt.rgba(0.06, 0.72, 0.51, 0.25) : Qt.rgba(0.94, 0.27, 0.27, 0.25)
+                  Text {
+                    id: limineKeyTxt
+                    anchors.centerIn: parent
+                    text: "L"
+                    font.pixelSize: 8
+                    font.weight: Font.Bold
+                    color: limineBootBtn.syncActive ? "#10B981" : "#EF4444"
+                  }
+                }
               }
             }
 
@@ -1505,17 +1640,31 @@ Item {
                       }
                     }
 
-                    // Bootable Chip
+                    // Bootable in Limine Chip
                     Rectangle {
                       implicitHeight: 18
-                      implicitWidth: 60
+                      implicitWidth: bootChipRow.implicitWidth + 12
                       radius: 9
-                      color: Qt.rgba(0.06, 0.72, 0.51, 0.15)
+                      property bool isBootable: (modelData.bootableInLimine !== false)
+                      color: isBootable ? Qt.rgba(0.06, 0.72, 0.51, 0.15) : Qt.rgba(0.94, 0.27, 0.27, 0.15)
+                      border.color: isBootable ? Qt.rgba(0.06, 0.72, 0.51, 0.3) : Qt.rgba(0.94, 0.27, 0.27, 0.3)
+                      border.width: 1
+
                       RowLayout {
+                        id: bootChipRow
                         anchors.centerIn: parent
-                        spacing: 2
-                        Text { text: "󰌢"; font.pixelSize: 9; color: "#10B981" }
-                        Text { text: "Bootable"; font.pixelSize: 9; color: "#10B981" }
+                        spacing: 3
+                        Text {
+                          text: parent.parent.isBootable ? "󰌢" : "󰌣"
+                          font.pixelSize: 9
+                          color: parent.parent.isBootable ? "#10B981" : "#EF4444"
+                        }
+                        Text {
+                          text: parent.parent.isBootable ? "Limine Boot" : "Not in Limine"
+                          font.pixelSize: 9
+                          font.weight: Font.Medium
+                          color: parent.parent.isBootable ? "#10B981" : "#EF4444"
+                        }
                       }
                     }
 
@@ -2144,6 +2293,35 @@ Item {
                   Text { id: keyTxtOpt; anchors.centerIn: parent; text: "O"; font.pixelSize: 9; font.weight: Font.Bold; color: "#10B981" }
                 }
                 Text { text: "Optimize"; font.pixelSize: 10; color: Color.muted }
+              }
+            }
+
+            // Hint: Limine Boot
+            Rectangle {
+              id: hintLiminePill
+              implicitHeight: 24
+              implicitWidth: hLimineLayout.implicitWidth + 10
+              radius: 4
+              color: hLimineMouse.containsMouse ? Qt.rgba(0.06, 0.72, 0.51, 0.12) : "transparent"
+              MouseArea {
+                id: hLimineMouse
+                anchors.fill: parent
+                hoverEnabled: true
+                cursorShape: Qt.PointingHandCursor
+                onClicked: { root.openBootModal(); keyCatcher.forceActiveFocus() }
+              }
+              RowLayout {
+                id: hLimineLayout
+                anchors.centerIn: parent
+                spacing: 4
+                Rectangle {
+                  implicitHeight: 17
+                  implicitWidth: keyTxtLimine.implicitWidth + 6
+                  radius: 3
+                  color: Qt.rgba(0.06, 0.72, 0.51, 0.2)
+                  Text { id: keyTxtLimine; anchors.centerIn: parent; text: "L"; font.pixelSize: 9; font.weight: Font.Bold; color: "#10B981" }
+                }
+                Text { text: "Limine"; font.pixelSize: 10; color: Color.muted }
               }
             }
 
@@ -3609,6 +3787,425 @@ Item {
                     font.pixelSize: 12
                     font.weight: Font.Bold
                     color: (root.activeOptimizeData && root.activeOptimizeData.prunableCount > 0 && !root.isOptimizing) ? "#181825" : Color.muted
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+
+      // ==========================================
+      // MODAL 7: LIMINE BOOTLOADER VERIFICATION & HEALTH
+      // ==========================================
+      Rectangle {
+        visible: root.showBootModal
+        anchors.fill: parent
+        color: Qt.rgba(0, 0, 0, 0.75)
+
+        MouseArea {
+          anchors.fill: parent
+          onClicked: {
+            if (!root.isSyncingBoot) root.showBootModal = false
+          }
+        }
+
+        Rectangle {
+          id: bootModalCard
+          anchors.centerIn: parent
+          width: 640
+          implicitHeight: Math.min(540, bootCol.implicitHeight + 40)
+          radius: 12
+          color: Color.background
+          border.color: "#10B981"
+          border.width: 1
+          focus: root.showBootModal
+
+          Keys.onEscapePressed: {
+            if (!root.isSyncingBoot) {
+              root.showBootModal = false
+              keyCatcher.forceActiveFocus()
+            }
+          }
+          Keys.onReturnPressed: {
+            if (!root.isSyncingBoot) {
+              root.executeBootSync()
+            }
+          }
+          Keys.onEnterPressed: {
+            if (!root.isSyncingBoot) {
+              root.executeBootSync()
+            }
+          }
+
+          MouseArea { anchors.fill: parent }
+
+          ColumnLayout {
+            id: bootCol
+            anchors.fill: parent
+            anchors.margins: 20
+            spacing: 14
+
+            // Title & Icon + Health Badge
+            RowLayout {
+              Layout.fillWidth: true
+              spacing: 10
+              Text { text: "󰌢"; font.pixelSize: 22; color: "#10B981" }
+              ColumnLayout {
+                Layout.fillWidth: true
+                spacing: 2
+                Text {
+                  text: "Limine Bootloader Verification & Health"
+                  font.pixelSize: 16
+                  font.weight: Font.Bold
+                  color: Color.foreground
+                }
+                Text {
+                  text: (root.activeBootData && root.activeBootData.healthReason) || "Inspecting Limine configuration, EFI kernel payloads and ESP headroom..."
+                  font.pixelSize: 11
+                  color: Color.muted
+                  Layout.fillWidth: true
+                  elide: Text.ElideRight
+                }
+              }
+
+              // Health Status Badge
+              Rectangle {
+                implicitHeight: 22
+                implicitWidth: healthBadgeRow.implicitWidth + 12
+                radius: 11
+                property bool isHealthy: (root.activeBootData && root.activeBootData.healthStatus === "healthy")
+                color: isHealthy ? Qt.rgba(0.06, 0.72, 0.51, 0.15) : Qt.rgba(0.96, 0.62, 0.04, 0.15)
+                border.color: isHealthy ? "#10B981" : "#F59E0B"
+                border.width: 1
+
+                RowLayout {
+                  id: healthBadgeRow
+                  anchors.centerIn: parent
+                  spacing: 4
+                  Text {
+                    text: parent.parent.isHealthy ? "●" : "▲"
+                    font.pixelSize: 8
+                    color: parent.parent.isHealthy ? "#10B981" : "#F59E0B"
+                  }
+                  Text {
+                    text: (root.activeBootData && root.activeBootData.healthLabel) || "Checking..."
+                    font.pixelSize: 10
+                    font.weight: Font.Bold
+                    color: parent.parent.isHealthy ? "#10B981" : "#F59E0B"
+                  }
+                }
+              }
+            }
+
+            // Stat tiles grid (4 columns)
+            RowLayout {
+              Layout.fillWidth: true
+              spacing: 8
+
+              // Tile 1: ESP Storage
+              Rectangle {
+                Layout.fillWidth: true
+                implicitHeight: 52
+                radius: 6
+                color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.04)
+                border.color: (root.activeBootData && root.activeBootData.espWarning) ? "#EF4444" : Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.08)
+                ColumnLayout {
+                  anchors.centerIn: parent
+                  spacing: 2
+                  Text {
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    text: root.activeBootData ? (root.activeBootData.espUsedHuman + " / " + root.activeBootData.espSizeHuman) : "--"
+                    font.pixelSize: 12
+                    font.weight: Font.Bold
+                    color: (root.activeBootData && root.activeBootData.espWarning) ? "#EF4444" : Color.foreground
+                  }
+                  Text {
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    text: root.activeBootData ? ("ESP " + root.activeBootData.espUsedPercent + "% used (" + root.activeBootData.limitUsagePercent + "% limit)") : "ESP Storage"
+                    font.pixelSize: 9
+                    color: Color.muted
+                  }
+                }
+              }
+
+              // Tile 2: Sync Daemon
+              Rectangle {
+                Layout.fillWidth: true
+                implicitHeight: 52
+                radius: 6
+                color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.04)
+                border.color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.08)
+                ColumnLayout {
+                  anchors.centerIn: parent
+                  spacing: 2
+                  Text {
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    text: (root.activeBootData && root.activeBootData.daemonActive) ? "Active" : "Offline"
+                    font.pixelSize: 13
+                    font.weight: Font.Bold
+                    color: (root.activeBootData && root.activeBootData.daemonActive) ? "#10B981" : "#EF4444"
+                  }
+                  Text {
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    text: "limine-snapper-sync"
+                    font.pixelSize: 9
+                    color: Color.muted
+                  }
+                }
+              }
+
+              // Tile 3: Verified Boot Entries
+              Rectangle {
+                Layout.fillWidth: true
+                implicitHeight: 52
+                radius: 6
+                color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.04)
+                border.color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.08)
+                ColumnLayout {
+                  anchors.centerIn: parent
+                  spacing: 2
+                  Text {
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    text: root.activeBootData ? (String(root.activeBootData.totalEntries) + " Snapshots") : "--"
+                    font.pixelSize: 13
+                    font.weight: Font.Bold
+                    color: "#10B981"
+                  }
+                  Text {
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    text: "Limine Boot Menu"
+                    font.pixelSize: 9
+                    color: Color.muted
+                  }
+                }
+              }
+
+              // Tile 4: Last Sync
+              Rectangle {
+                Layout.fillWidth: true
+                implicitHeight: 52
+                radius: 6
+                color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.04)
+                border.color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.08)
+                ColumnLayout {
+                  anchors.centerIn: parent
+                  spacing: 2
+                  Text {
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    text: (root.activeBootData && root.activeBootData.lastSyncRelative) ? root.activeBootData.lastSyncRelative : "--"
+                    font.pixelSize: 13
+                    font.weight: Font.Bold
+                    color: Color.foreground
+                  }
+                  Text {
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    text: (root.activeBootData && root.activeBootData.lastSyncTimestamp) ? root.activeBootData.lastSyncTimestamp : "Last Synced"
+                    font.pixelSize: 9
+                    color: Color.muted
+                  }
+                }
+              }
+            }
+
+            // Entries section header
+            Text {
+              text: "Verified Bootable Snapshots in Limine Menu"
+              font.pixelSize: 12
+              font.weight: Font.Bold
+              color: Color.foreground
+            }
+
+            // Table header
+            Rectangle {
+              Layout.fillWidth: true
+              implicitHeight: 26
+              radius: 4
+              color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.04)
+
+              RowLayout {
+                anchors.fill: parent
+                anchors.leftMargin: 10
+                anchors.rightMargin: 10
+                spacing: 8
+
+                Text { text: "ID"; font.pixelSize: 10; font.weight: Font.Bold; color: Color.muted; Layout.preferredWidth: 36 }
+                Text { text: "Kernel & Release"; font.pixelSize: 10; font.weight: Font.Bold; color: Color.muted; Layout.preferredWidth: 150 }
+                Text { text: "EFI Payload"; font.pixelSize: 10; font.weight: Font.Bold; color: Color.muted; Layout.preferredWidth: 140 }
+                Text { text: "Snapshot Timestamp"; font.pixelSize: 10; font.weight: Font.Bold; color: Color.muted; Layout.fillWidth: true }
+                Text { text: "Status"; font.pixelSize: 10; font.weight: Font.Bold; color: Color.muted; Layout.preferredWidth: 105; horizontalAlignment: Text.AlignRight }
+              }
+            }
+
+            // List of verified Limine entries
+            ScrollView {
+              Layout.fillWidth: true
+              implicitHeight: 180
+              clip: true
+
+              ListView {
+                id: bootEntriesList
+                anchors.fill: parent
+                spacing: 4
+                model: (root.activeBootData && root.activeBootData.entries) || []
+
+                delegate: Rectangle {
+                  width: bootEntriesList.width
+                  implicitHeight: 34
+                  radius: 5
+                  color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, index % 2 === 0 ? 0.02 : 0.04)
+
+                  RowLayout {
+                    anchors.fill: parent
+                    anchors.leftMargin: 10
+                    anchors.rightMargin: 10
+                    spacing: 8
+
+                    Rectangle {
+                      implicitHeight: 18
+                      implicitWidth: 32
+                      radius: 4
+                      color: Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.15)
+                      Text {
+                        anchors.centerIn: parent
+                        text: "#" + modelData.snapshotId
+                        font.pixelSize: 9
+                        font.weight: Font.Bold
+                        color: Color.accent
+                      }
+                    }
+
+                    Text {
+                      text: modelData.kernel + (modelData.kernelRelease ? (" (" + modelData.kernelRelease + ")") : "")
+                      font.pixelSize: 11
+                      color: Color.foreground
+                      Layout.preferredWidth: 150
+                      elide: Text.ElideRight
+                    }
+
+                    Text {
+                      text: modelData.efiPayload || "EFI"
+                      font.pixelSize: 11
+                      font.family: "monospace"
+                      color: Color.muted
+                      Layout.preferredWidth: 140
+                      elide: Text.ElideRight
+                    }
+
+                    Text {
+                      text: modelData.timestamp || ""
+                      font.pixelSize: 10
+                      color: Color.muted
+                      Layout.fillWidth: true
+                    }
+
+                    Rectangle {
+                      implicitHeight: 18
+                      implicitWidth: 95
+                      radius: 9
+                      color: Qt.rgba(0.06, 0.72, 0.51, 0.15)
+                      border.color: Qt.rgba(0.06, 0.72, 0.51, 0.3)
+                      border.width: 1
+
+                      RowLayout {
+                        anchors.centerIn: parent
+                        spacing: 3
+                        Text { text: "✓"; font.pixelSize: 9; color: "#10B981" }
+                        Text { text: "Boot Ready"; font.pixelSize: 9; font.weight: Font.Medium; color: "#10B981" }
+                      }
+                    }
+                  }
+                }
+
+                Item {
+                  visible: !bootEntriesList.model || bootEntriesList.model.length === 0
+                  width: bootEntriesList.width
+                  height: 100
+                  ColumnLayout {
+                    anchors.centerIn: parent
+                    spacing: 6
+                    Text {
+                      anchors.horizontalCenter: parent.horizontalCenter
+                      text: "󰄬"
+                      font.pixelSize: 22
+                      color: Color.muted
+                    }
+                    Text {
+                      anchors.horizontalCenter: parent.horizontalCenter
+                      text: "No snapshot entries registered in Limine configuration."
+                      font.pixelSize: 12
+                      color: Color.muted
+                    }
+                  }
+                }
+              }
+            }
+
+            // Bottom action bar
+            RowLayout {
+              Layout.fillWidth: true
+              spacing: 12
+
+              Text {
+                text: "󰋼 Limine boots directly into read-only btrfs snapshots to recover from kernel or driver breakage."
+                font.pixelSize: 10
+                color: Color.muted
+                Layout.fillWidth: true
+                wrapMode: Text.WordWrap
+              }
+
+              Rectangle {
+                implicitHeight: 34
+                implicitWidth: 80
+                radius: 6
+                color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.08)
+                MouseArea {
+                  anchors.fill: parent
+                  cursorShape: Qt.PointingHandCursor
+                  onClicked: {
+                    if (!root.isSyncingBoot) root.showBootModal = false
+                  }
+                }
+                Text {
+                  anchors.centerIn: parent
+                  text: "Close"
+                  font.pixelSize: 12
+                  color: Color.muted
+                }
+              }
+
+              Rectangle {
+                implicitHeight: 34
+                implicitWidth: 170
+                radius: 6
+                color: root.isSyncingBoot ? Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.1) : "#10B981"
+                opacity: root.isSyncingBoot ? 0.6 : 1.0
+
+                MouseArea {
+                  anchors.fill: parent
+                  cursorShape: root.isSyncingBoot ? Qt.ArrowCursor : Qt.PointingHandCursor
+                  onClicked: {
+                    if (!root.isSyncingBoot) {
+                      root.executeBootSync()
+                    }
+                  }
+                }
+
+                RowLayout {
+                  anchors.centerIn: parent
+                  spacing: 6
+                  Text {
+                    text: root.isSyncingBoot ? "󰑐" : "󰌢"
+                    font.pixelSize: 13
+                    color: root.isSyncingBoot ? Color.muted : "#181825"
+                    rotation: root.isSyncingBoot ? 180 : 0
+                    Behavior on rotation { NumberAnimation { duration: 400 } }
+                  }
+                  Text {
+                    text: root.isSyncingBoot ? "Syncing Limine..." : "Sync Bootloader Now"
+                    font.pixelSize: 12
+                    font.weight: Font.Bold
+                    color: root.isSyncingBoot ? Color.muted : "#181825"
                   }
                 }
               }

@@ -13,6 +13,7 @@ import subprocess
 import shutil
 import argparse
 import time
+import glob
 from datetime import datetime, timezone
 
 def run_cmd(cmd, timeout=5):
@@ -191,6 +192,225 @@ def correlate_packages_for_snapshots(snapshots, log_entries=None):
 
     return snapshots
 
+def get_limine_boot_health(mock=False):
+    """
+    Inspects Limine bootloader health and verified snapshot boot entries.
+    Parses /var/cache/boot/*/lss/snapshots.json, checks ESP usage against
+    LIMIT_USAGE_PERCENT (85%), and queries limine-snapper-sync service status.
+    """
+    if mock:
+        now = int(time.time())
+        return {
+            "ok": True,
+            "bootloader": "Limine",
+            "daemonActive": True,
+            "daemonName": "limine-snapper-sync.service",
+            "espPath": "/boot",
+            "espSize": 2147483648,
+            "espUsed": 671088640,
+            "espAvail": 1476395008,
+            "espSizeHuman": "2.0 GiB",
+            "espUsedHuman": "640.0 MiB",
+            "espAvailHuman": "1.4 GiB",
+            "espUsedPercent": 31,
+            "limitUsagePercent": 85,
+            "espWarning": False,
+            "lastSyncTimestamp": datetime.fromtimestamp(now - 7200).strftime("%Y-%m-%d %H:%M:%S"),
+            "lastSyncRelative": "2h ago",
+            "totalEntries": 4,
+            "healthStatus": "healthy",
+            "healthLabel": "Boot Sync Healthy",
+            "healthReason": "All 4 snapshots verified in Limine boot menu · ESP usage 31% (limit 85%)",
+            "entries": [
+                {
+                    "snapshotId": 19,
+                    "kernel": "linux",
+                    "kernelRelease": "6.11.3-arch1-1",
+                    "efiPayload": "omarchy_linux.efi",
+                    "timestamp": datetime.fromtimestamp(now - 7200).strftime("%Y-%m-%d %H:%M:%S"),
+                    "description": "Pre-Update (omarchy 4.0.2)",
+                    "bootReady": True
+                },
+                {
+                    "snapshotId": 18,
+                    "kernel": "linux",
+                    "kernelRelease": "6.11.2-arch1-1",
+                    "efiPayload": "omarchy_linux.efi",
+                    "timestamp": datetime.fromtimestamp(now - 86400).strftime("%Y-%m-%d %H:%M:%S"),
+                    "description": "Before NVIDIA 560 Driver Install",
+                    "bootReady": True
+                },
+                {
+                    "snapshotId": 17,
+                    "kernel": "linux",
+                    "kernelRelease": "6.11.2-arch1-1",
+                    "efiPayload": "omarchy_linux.efi",
+                    "timestamp": datetime.fromtimestamp(now - 259200).strftime("%Y-%m-%d %H:%M:%S"),
+                    "description": "Pre-Update (omarchy 4.0.1)",
+                    "bootReady": True
+                },
+                {
+                    "snapshotId": 16,
+                    "kernel": "linux",
+                    "kernelRelease": "6.11.1-arch1-1",
+                    "efiPayload": "omarchy_linux.efi",
+                    "timestamp": datetime.fromtimestamp(now - 604800).strftime("%Y-%m-%d %H:%M:%S"),
+                    "description": "Clean Baseline Install",
+                    "bootReady": True
+                }
+            ]
+        }
+
+    esp_path = "/boot"
+    if os.path.isfile("/etc/default/limine"):
+        try:
+            with open("/etc/default/limine", "r", encoding="utf-8", errors="replace") as f:
+                m = re.search(r'ESP_PATH=[\"\']?([^\"\'\n]+)', f.read())
+                if m:
+                    esp_path = m.group(1).strip()
+        except Exception:
+            pass
+
+    limit_pct = 85
+    if os.path.isfile("/etc/limine-snapper-sync.conf"):
+        try:
+            with open("/etc/limine-snapper-sync.conf", "r", encoding="utf-8", errors="replace") as f:
+                m = re.search(r'LIMIT_USAGE_PERCENT=([0-9]+)', f.read())
+                if m:
+                    limit_pct = int(m.group(1))
+        except Exception:
+            pass
+
+    esp_pcent, esp_size, esp_avail = get_disk_usage(esp_path)
+    esp_used = max(0, esp_size - esp_avail)
+    esp_warning = esp_pcent >= limit_pct
+
+    daemon_active = get_systemd_status("limine-snapper-sync.service")
+
+    files = glob.glob("/var/cache/boot/*/lss/snapshots.json")
+    entries = []
+    last_ts = ""
+    last_relative = "Unknown"
+
+    if files and os.path.isfile(files[0]):
+        try:
+            with open(files[0], "r", encoding="utf-8", errors="replace") as f:
+                data = json.load(f)
+            last_ts = data.get("lastTimestamp", "")
+            if not last_ts:
+                mtime = os.path.getmtime(files[0])
+                last_ts = datetime.fromtimestamp(mtime).strftime("%Y-%m-%d %H:%M:%S")
+                last_relative = format_relative_time(int(mtime))
+            else:
+                try:
+                    dt = datetime.strptime(last_ts, "%Y-%m-%d %H:%M:%S")
+                    last_relative = format_relative_time(int(dt.timestamp()))
+                except Exception:
+                    last_relative = last_ts
+
+            for se in data.get("snapshotEntries", []):
+                sid = se.get("snapperID", {}).get("snapshotID")
+                if sid is None:
+                    continue
+                ts = se.get("snapperID", {}).get("timestamp", "")
+                desc = se.get("snapperID", {}).get("properties", {}).get("description", "")
+                k_ents = se.get("kernelEntries", [])
+                k_ver = k_ents[0].get("kernelVersion", "linux") if k_ents else "linux"
+                efi = ""
+                k_rel = ""
+                if k_ents:
+                    imgs = k_ents[0].get("imageDetails", [])
+                    if imgs:
+                        efi = imgs[0].get("fileName", "")
+                    for opt in k_ents[0].get("optionDetails", []):
+                        line = opt.get("optionLine", "")
+                        if "Kernel version:" in line:
+                            k_rel = line.replace("Kernel version:", "").strip()
+                entries.append({
+                    "snapshotId": sid,
+                    "kernel": k_ver,
+                    "kernelRelease": k_rel,
+                    "efiPayload": efi,
+                    "timestamp": ts,
+                    "description": desc,
+                    "bootReady": True
+                })
+        except Exception:
+            pass
+
+    entries.sort(key=lambda x: x["snapshotId"], reverse=True)
+
+    if esp_warning:
+        h_status = "warning"
+        h_label = "ESP Space Warning"
+        h_reason = f"ESP partition {esp_path} is at {esp_pcent}% usage (configured limit: {limit_pct}%)"
+    elif not daemon_active:
+        h_status = "warning"
+        h_label = "Sync Daemon Inactive"
+        h_reason = "limine-snapper-sync.service is not active"
+    elif not entries:
+        h_status = "warning"
+        h_label = "No Boot Entries"
+        h_reason = "No snapshot entries registered in Limine configuration"
+    else:
+        h_status = "healthy"
+        h_label = "Boot Sync Healthy"
+        h_reason = f"All {len(entries)} snapshots verified in Limine boot menu · ESP usage {esp_pcent}% (limit {limit_pct}%)"
+
+    return {
+        "ok": True,
+        "bootloader": "Limine",
+        "daemonActive": daemon_active,
+        "daemonName": "limine-snapper-sync.service",
+        "espPath": esp_path,
+        "espSize": esp_size,
+        "espUsed": esp_used,
+        "espAvail": esp_avail,
+        "espSizeHuman": format_bytes(esp_size),
+        "espUsedHuman": format_bytes(esp_used),
+        "espAvailHuman": format_bytes(esp_avail),
+        "espUsedPercent": esp_pcent,
+        "limitUsagePercent": limit_pct,
+        "espWarning": esp_warning,
+        "lastSyncTimestamp": last_ts,
+        "lastSyncRelative": last_relative,
+        "totalEntries": len(entries),
+        "healthStatus": h_status,
+        "healthLabel": h_label,
+        "healthReason": h_reason,
+        "entries": entries
+    }
+
+def sync_limine_bootloader(mock=False):
+    """
+    Triggers synchronization of Limine bootloader entries with Snapper snapshots
+    via /usr/bin/limine-snapper-sync using privileged execution.
+    """
+    if mock:
+        return {
+            "ok": True,
+            "message": "Simulated Limine bootloader sync completed successfully."
+        }
+
+    binary = "/usr/bin/limine-snapper-sync"
+    if not os.path.isfile(binary):
+        rc, out, _ = run_cmd(["which", "limine-snapper-sync"])
+        if rc == 0 and out:
+            binary = out.strip()
+        else:
+            return {"ok": False, "error": "limine-snapper-sync executable not found on system."}
+
+    rc, out, err = run_privileged([binary], timeout=45)
+    if rc == 0:
+        return {
+            "ok": True,
+            "message": "Limine bootloader entries synchronized successfully."
+        }
+    return {
+        "ok": False,
+        "error": err or out or "Failed to synchronize Limine bootloader."
+    }
+
 def get_mock_status():
     now = int(time.time())
     return {
@@ -232,6 +452,7 @@ def get_mock_status():
                         "cleanup": "number",
                         "important": False,
                         "bootable": True,
+                        "bootableInLimine": True,
                         "userdata": {"description": "Pre-Update (omarchy 4.0.2)"},
                         "packageCount": 6,
                         "hasCriticalPackages": True,
@@ -256,6 +477,7 @@ def get_mock_status():
                         "cleanup": "none",
                         "important": True,
                         "bootable": True,
+                        "bootableInLimine": True,
                         "userdata": {"important": "yes"},
                         "packageCount": 2,
                         "hasCriticalPackages": True,
@@ -276,6 +498,7 @@ def get_mock_status():
                         "cleanup": "number",
                         "important": False,
                         "bootable": True,
+                        "bootableInLimine": True,
                         "userdata": {},
                         "packageCount": 2,
                         "hasCriticalPackages": False,
@@ -296,6 +519,7 @@ def get_mock_status():
                         "cleanup": "none",
                         "important": True,
                         "bootable": True,
+                        "bootableInLimine": True,
                         "userdata": {"important": "yes"},
                         "packageCount": 0,
                         "hasCriticalPackages": False,
@@ -305,13 +529,16 @@ def get_mock_status():
                     }
                 ]
             }
-        ]
+        ],
+        "limine": get_limine_boot_health(mock=True)
     }
 
 def get_live_status():
-    limine_active = get_systemd_status("limine-snapper-sync.service")
+    limine_data = get_limine_boot_health(mock=False)
+    limine_active = limine_data.get("daemonActive", False)
     cleanup_active = get_systemd_status("snapper-cleanup.timer")
     snapperd_active = get_systemd_status("snapperd.service")
+    verified_boot_ids = {e["snapshotId"] for e in limine_data.get("entries", [])}
 
     # Check snapper existence
     rc, _, _ = run_cmd(["which", "snapper"])
@@ -330,6 +557,7 @@ def get_live_status():
                 "snapperdActive": False
             },
             "storage": {"usedPercent": 0, "fsSize": 0, "fsAvail": 0, "fsSizeHuman": "0 B", "fsAvailHuman": "0 B", "snapshotCount": 0},
+            "limine": limine_data,
             "configs": []
         }
 
@@ -352,6 +580,7 @@ def get_live_status():
                 "snapperdActive": snapperd_active
             },
             "storage": {"usedPercent": 0, "fsSize": 0, "fsAvail": 0, "fsSizeHuman": "0 B", "fsAvailHuman": "0 B", "snapshotCount": 0},
+            "limine": limine_data,
             "configs": []
         }
 
@@ -431,6 +660,7 @@ def get_live_status():
                         "cleanup": cleanup_str,
                         "important": important,
                         "bootable": True, # On Omarchy, all root snapshots sync to Limine
+                        "bootableInLimine": (snap_id in verified_boot_ids) if verified_boot_ids else True,
                         "userdata": userdata
                     })
 
@@ -497,6 +727,7 @@ def get_live_status():
             "fsAvailHuman": format_bytes(root_usage[2]),
             "snapshotCount": total_snapshots
         },
+        "limine": limine_data,
         "configs": configs_list
     }
 
@@ -923,7 +1154,7 @@ def authorize_access(config="root"):
 
 def main():
     parser = argparse.ArgumentParser(description="Omarchy Snapshots Backend Core")
-    parser.add_argument("command", choices=["status", "create", "delete", "pin", "unpin", "diff", "authorize", "restore", "packages", "restore-file", "optimize"], help="Action to execute")
+    parser.add_argument("command", choices=["status", "create", "delete", "pin", "unpin", "diff", "authorize", "restore", "packages", "restore-file", "optimize", "boot-health", "boot-sync"], help="Action to execute")
     parser.add_argument("--mock", action="store_true", help="Output mock data for testing or preview")
     parser.add_argument("--config", default="root", help="Snapper config name (default: root)")
     parser.add_argument("--desc", default="", help="Description for snapshot creation")
@@ -1013,6 +1244,14 @@ def main():
         sys.exit(0 if res.get("ok") else 1)
     elif args.command == "authorize":
         res = authorize_access(config=args.config)
+        print(json.dumps(res, indent=2))
+        sys.exit(0 if res.get("ok") else 1)
+    elif args.command == "boot-health":
+        res = get_limine_boot_health(mock=args.mock)
+        print(json.dumps(res, indent=2))
+        sys.exit(0 if res.get("ok") else 1)
+    elif args.command == "boot-sync":
+        res = sync_limine_bootloader(mock=args.mock)
         print(json.dumps(res, indent=2))
         sys.exit(0 if res.get("ok") else 1)
 

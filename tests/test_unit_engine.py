@@ -291,11 +291,44 @@ class TestUnitEngine(unittest.TestCase):
         self.assertIn("health", st)
         self.assertIn("storage", st)
         self.assertIn("configs", st)
+        self.assertIn("limine", st)
         self.assertTrue(st["health"]["limineSyncActive"])
         self.assertTrue(st["readable"])
         self.assertGreater(len(st["configs"]), 0)
         self.assertTrue(st["configs"][0]["readable"])
         self.assertGreater(len(st["configs"][0]["snapshots"]), 0)
+        self.assertTrue(st["configs"][0]["snapshots"][0].get("bootableInLimine"))
+
+    def test_limine_boot_health_mock(self):
+        lh = core.get_limine_boot_health(mock=True)
+        self.assertTrue(lh["ok"])
+        self.assertEqual(lh["bootloader"], "Limine")
+        self.assertTrue(lh["daemonActive"])
+        self.assertEqual(lh["espPath"], "/boot")
+        self.assertEqual(lh["limitUsagePercent"], 85)
+        self.assertFalse(lh["espWarning"])
+        self.assertEqual(lh["totalEntries"], 4)
+        self.assertEqual(lh["healthStatus"], "healthy")
+        self.assertEqual(len(lh["entries"]), 4)
+        for e in lh["entries"]:
+            self.assertIn("snapshotId", e)
+            self.assertIn("kernel", e)
+            self.assertIn("kernelRelease", e)
+            self.assertIn("efiPayload", e)
+            self.assertTrue(e["bootReady"])
+
+    def test_sync_limine_bootloader_mock(self):
+        res = core.sync_limine_bootloader(mock=True)
+        self.assertTrue(res["ok"])
+        self.assertIn("Simulated Limine bootloader sync", res["message"])
+
+    def test_limine_boot_health_live(self):
+        lh = core.get_limine_boot_health(mock=False)
+        self.assertTrue(lh["ok"])
+        self.assertEqual(lh["bootloader"], "Limine")
+        self.assertIn("espUsedPercent", lh)
+        self.assertIn("entries", lh)
+        self.assertIn("healthStatus", lh)
 
 if __name__ == "__main__":
     unittest.main()

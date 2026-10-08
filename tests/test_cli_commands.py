@@ -180,5 +180,18 @@ class TestCliCommands(unittest.TestCase):
         self.assertEqual(res.returncode, 0)
         subprocess.run(["omarchy-shell", "-q", "shell", "hide", "ac.snapshots"])
 
+    def test_cli_boot_health_mock(self):
+        res = self.run_cmd(CLI_BIN, ["boot-health", "--mock"])
+        self.assertEqual(res.returncode, 0)
+        self.assertIn("Limine Bootloader Snapshot Verification & Health", res.stdout)
+        self.assertIn("Boot Sync Healthy", res.stdout)
+        self.assertIn("ESP Partition:", res.stdout)
+        self.assertIn("Verified Bootable", res.stdout)
+
+    def test_cli_boot_sync_mock(self):
+        res = self.run_cmd(CLI_BIN, ["boot-sync", "--mock"])
+        self.assertEqual(res.returncode, 0)
+        self.assertIn("Simulated Limine bootloader sync completed successfully", res.stdout)
+
 if __name__ == "__main__":
     unittest.main()
