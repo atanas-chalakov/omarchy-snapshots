@@ -28,6 +28,14 @@ class TestIpcIntegration(unittest.TestCase):
             return False
         return False
 
+    def wait_for_window(self, target_state=True, timeout=2.0):
+        start = time.time()
+        while time.time() - start < timeout:
+            if self.is_window_open() == target_state:
+                return True
+            time.sleep(0.1)
+        return self.is_window_open() == target_state
+
     def test_shell_plugin_registered(self):
         res = self.run_cmd(["omarchy-shell", "shell", "listPlugins"])
         self.assertEqual(res.returncode, 0, "omarchy-shell must be reachable")
@@ -39,34 +47,28 @@ class TestIpcIntegration(unittest.TestCase):
         self.assertEqual(res_summon.returncode, 0)
         self.assertEqual(res_summon.stdout.strip(), "ok")
 
-        # Give compositor 0.6s to create window surface
-        time.sleep(0.6)
-        self.assertTrue(self.is_window_open(), "Window 'Snapshots & Recovery' must appear in Hyprland clients")
+        self.assertTrue(self.wait_for_window(True), "Window 'Snapshots & Recovery' must appear in Hyprland clients")
 
         # 2. Hide window
         res_hide = self.run_cmd(["omarchy-shell", "shell", "hide", "ac.snapshots"])
         self.assertEqual(res_hide.returncode, 0)
 
-        # Give compositor 0.6s to tear down surface
-        time.sleep(0.6)
-        self.assertFalse(self.is_window_open(), "Window 'Snapshots & Recovery' must be hidden after hide command")
+        self.assertTrue(self.wait_for_window(False), "Window 'Snapshots & Recovery' must be hidden after hide command")
 
     def test_toggle_lifecycle(self):
         # Ensure hidden first
         self.run_cmd(["omarchy-shell", "-q", "shell", "hide", "ac.snapshots"])
-        time.sleep(0.4)
+        self.wait_for_window(False)
 
         # Toggle ON
         res_toggle_on = self.run_cmd(["omarchy-shell", "shell", "toggle", "ac.snapshots", '{"mock":true}'])
         self.assertEqual(res_toggle_on.returncode, 0)
-        time.sleep(0.6)
-        self.assertTrue(self.is_window_open(), "Window must open after toggle ON")
+        self.assertTrue(self.wait_for_window(True), "Window must open after toggle ON")
 
         # Toggle OFF
         res_toggle_off = self.run_cmd(["omarchy-shell", "shell", "toggle", "ac.snapshots"])
         self.assertEqual(res_toggle_off.returncode, 0)
-        time.sleep(0.6)
-        self.assertFalse(self.is_window_open(), "Window must close after toggle OFF")
+        self.assertTrue(self.wait_for_window(False), "Window must close after toggle OFF")
 
     @classmethod
     def tearDownClass(cls):
