@@ -203,6 +203,7 @@ Item {
     if (!activeRestoreSnapshot) return
     var id = activeRestoreSnapshot.id
     showRestoreModal = false
+    if (keyCatcher) keyCatcher.forceActiveFocus()
     notify("Launching recovery for snapshot #" + id + "...")
     var args = [coreScript, "restore", "--id", String(id)]
     if (useMockData) args.push("--mock")
@@ -221,6 +222,7 @@ Item {
     if (!activeDeleteSnapshot) return
     var id = activeDeleteSnapshot.id
     showDeleteModal = false
+    if (keyCatcher) keyCatcher.forceActiveFocus()
     notify("Pruning snapshot #" + id + "...")
     var args = [coreScript, "delete", "--id", String(id)]
     if (useMockData) args.push("--mock")
@@ -257,6 +259,9 @@ Item {
       } catch(e) {}
     }
     refresh()
+    Qt.callLater(function() {
+      if (keyCatcher) keyCatcher.forceActiveFocus()
+    })
   }
 
   function close() {
@@ -379,6 +384,9 @@ Item {
 
   Component.onCompleted: {
     refresh()
+    Qt.callLater(function() {
+      if (keyCatcher) keyCatcher.forceActiveFocus()
+    })
   }
 
   // Floating Window Container
@@ -394,156 +402,209 @@ Item {
 
     onVisibleChanged: {
       if (visible) {
-        Qt.callLater(function() { mainContainer.forceActiveFocus() })
+        Qt.callLater(function() {
+          if (keyCatcher) keyCatcher.forceActiveFocus()
+        })
       }
     }
 
-    Item {
-      id: mainContainer
+    FocusScope {
+      id: focusScope
       anchors.fill: parent
       focus: true
 
-      Keys.onPressed: function(event) {
-        // If diff modal is open
-        if (root.showDiffModal) {
-          if (event.key === Qt.Key_Escape || event.key === Qt.Key_Q) {
-            root.showDiffModal = false
-            mainContainer.forceActiveFocus()
+      readonly property var mainContainer: keyCatcher
+
+      // Secondary navigation key handler forwarded from keyCatcher
+      Item {
+        id: navKeyHandler
+        Keys.onPressed: function(event) {
+          if (event.key === Qt.Key_Home) {
+            if (root.filteredSnapshots.length > 0) {
+              root.selectedIndex = 0
+              timelineView.positionViewAtIndex(0, ListView.Contain)
+            }
+            event.accepted = true
+          } else if (event.key === Qt.Key_End) {
+            if (root.filteredSnapshots.length > 0) {
+              root.selectedIndex = root.filteredSnapshots.length - 1
+              timelineView.positionViewAtIndex(root.selectedIndex, ListView.Contain)
+            }
+            event.accepted = true
+          } else if (event.key === Qt.Key_PageDown) {
+            if (root.filteredSnapshots.length > 0) {
+              root.selectedIndex = Math.min(root.filteredSnapshots.length - 1, root.selectedIndex + 5)
+              timelineView.positionViewAtIndex(root.selectedIndex, ListView.Contain)
+            }
+            event.accepted = true
+          } else if (event.key === Qt.Key_PageUp) {
+            if (root.filteredSnapshots.length > 0) {
+              root.selectedIndex = Math.max(0, root.selectedIndex - 5)
+              timelineView.positionViewAtIndex(root.selectedIndex, ListView.Contain)
+            }
+            event.accepted = true
+          } else if (event.key === Qt.Key_J || event.key === Qt.Key_Down) {
+            root.selectNext()
+            event.accepted = true
+          } else if (event.key === Qt.Key_K || event.key === Qt.Key_Up) {
+            root.selectPrev()
+            event.accepted = true
+          } else if (event.key === Qt.Key_C) {
+            root.openCreateModal()
+            event.accepted = true
+          } else if (event.key === Qt.Key_D) {
+            if (root.selectedSnapshot) root.inspectDiff(root.selectedSnapshot.id)
+            event.accepted = true
+          } else if (event.key === Qt.Key_B) {
+            if (root.selectedSnapshot) root.browseSnapshot(root.selectedSnapshot.id)
+            event.accepted = true
+          } else if (event.key === Qt.Key_P) {
+            if (root.selectedSnapshot) root.togglePin(root.selectedSnapshot.id, root.selectedSnapshot.important)
+            event.accepted = true
+          } else if (event.key === Qt.Key_R) {
+            if (root.showRestoreModal) root.executeRestore()
+            else if (root.selectedSnapshot) root.confirmRestore(root.selectedSnapshot)
+            event.accepted = true
+          } else if (event.key === Qt.Key_X) {
+            if (root.showDeleteModal) root.executeDelete()
+            else if (root.selectedSnapshot) root.confirmDelete(root.selectedSnapshot)
+            event.accepted = true
+          } else if (event.key === Qt.Key_F) {
+            searchInput.forceActiveFocus()
+            searchInput.selectAll()
+            event.accepted = true
+          } else if (event.key === Qt.Key_G) {
+            root.refresh()
+            event.accepted = true
+          } else if (event.key === Qt.Key_Escape || event.key === Qt.Key_Q) {
+            if (root.showDiffModal) {
+              root.showDiffModal = false
+              keyCatcher.forceActiveFocus()
+            } else if (root.showCreateModal) {
+              root.showCreateModal = false
+              keyCatcher.forceActiveFocus()
+            } else if (root.showRestoreModal) {
+              root.showRestoreModal = false
+              keyCatcher.forceActiveFocus()
+            } else if (root.showDeleteModal) {
+              root.showDeleteModal = false
+              keyCatcher.forceActiveFocus()
+            } else {
+              root.dismiss()
+            }
             event.accepted = true
           }
-          return
+        }
+      }
+
+      // Drop-in standard Omarchy panel key catcher with BeforeItem priority
+      PanelKeyCatcher {
+        id: keyCatcher
+        anchors.fill: parent
+        focus: true
+        Keys.priority: Keys.BeforeItem
+        Keys.forwardTo: [navKeyHandler]
+        blocked: (searchInput && searchInput.activeFocus)
+          || (typeof createDescInput !== "undefined" && createDescInput.activeFocus)
+          || (typeof diffFilterInput !== "undefined" && diffFilterInput.activeFocus)
+
+        onMoveRequested: function(dx, dy) {
+          if (dy > 0) root.selectNext()
+          else if (dy < 0) root.selectPrev()
+          else if (dx > 0) root.cycleFilter(1)
+          else if (dx < 0) root.cycleFilter(-1)
         }
 
-        // If create modal is open
-        if (root.showCreateModal) {
-          if (event.key === Qt.Key_Escape) {
-            root.showCreateModal = false
-            mainContainer.forceActiveFocus()
-            event.accepted = true
-          }
-          return
-        }
-
-        // If restore modal is open
-        if (root.showRestoreModal) {
-          if (event.key === Qt.Key_Escape) {
-            root.showRestoreModal = false
-            mainContainer.forceActiveFocus()
-            event.accepted = true
-          } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+        onActivateRequested: function() {
+          if (root.showRestoreModal) {
             root.executeRestore()
-            event.accepted = true
-          }
-          return
-        }
-
-        // If delete modal is open
-        if (root.showDeleteModal) {
-          if (event.key === Qt.Key_Escape) {
-            root.showDeleteModal = false
-            mainContainer.forceActiveFocus()
-            event.accepted = true
-          } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+          } else if (root.showDeleteModal) {
             root.executeDelete()
-            event.accepted = true
-          }
-          return
-        }
-
-        // If search input has active focus
-        if (searchInput.activeFocus) {
-          if (event.key === Qt.Key_Escape) {
-            searchInput.text = ""
-            mainContainer.forceActiveFocus()
-            event.accepted = true
-          } else if (event.key === Qt.Key_Down || event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
-            mainContainer.forceActiveFocus()
-            if (root.filteredSnapshots.length > 0) root.selectedIndex = 0
-            event.accepted = true
-          }
-          return
-        }
-
-        // Navigation
-        if (event.key === Qt.Key_J || event.key === Qt.Key_Down) {
-          root.selectNext()
-          event.accepted = true
-        } else if (event.key === Qt.Key_K || event.key === Qt.Key_Up) {
-          root.selectPrev()
-          event.accepted = true
-        } else if (event.key === Qt.Key_Home) {
-          if (root.filteredSnapshots.length > 0) {
-            root.selectedIndex = 0
-            timelineView.positionViewAtIndex(0, ListView.Contain)
-          }
-          event.accepted = true
-        } else if (event.key === Qt.Key_End) {
-          if (root.filteredSnapshots.length > 0) {
-            root.selectedIndex = root.filteredSnapshots.length - 1
-            timelineView.positionViewAtIndex(root.selectedIndex, ListView.Contain)
-          }
-          event.accepted = true
-        }
-        // Actions on selected snapshot
-        else if (event.key === Qt.Key_D || event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
-          if (root.selectedSnapshot) {
+          } else if (root.selectedSnapshot) {
             root.inspectDiff(root.selectedSnapshot.id)
-            event.accepted = true
           }
-        } else if (event.key === Qt.Key_B) {
-          if (root.selectedSnapshot) {
-            root.browseSnapshot(root.selectedSnapshot.id)
-            event.accepted = true
+        }
+
+        onCloseRequested: function() {
+          if (root.showDiffModal) {
+            root.showDiffModal = false
+            keyCatcher.forceActiveFocus()
+          } else if (root.showCreateModal) {
+            root.showCreateModal = false
+            keyCatcher.forceActiveFocus()
+          } else if (root.showRestoreModal) {
+            root.showRestoreModal = false
+            keyCatcher.forceActiveFocus()
+          } else if (root.showDeleteModal) {
+            root.showDeleteModal = false
+            keyCatcher.forceActiveFocus()
+          } else if (searchInput && searchInput.text.length > 0) {
+            searchInput.text = ""
+            keyCatcher.forceActiveFocus()
+          } else {
+            root.dismiss()
           }
-        } else if (event.key === Qt.Key_P) {
-          if (root.selectedSnapshot) {
-            root.togglePin(root.selectedSnapshot.id, root.selectedSnapshot.important)
-            event.accepted = true
-          }
-        } else if (event.key === Qt.Key_R) {
-          if (root.selectedSnapshot) {
-            root.confirmRestore(root.selectedSnapshot)
-            event.accepted = true
-          }
-        } else if (event.key === Qt.Key_X || event.key === Qt.Key_Delete) {
-          if (root.selectedSnapshot) {
+        }
+
+        onDeleteRequested: function() {
+          if (root.showDeleteModal) {
+            root.executeDelete()
+          } else if (root.selectedSnapshot) {
             root.confirmDelete(root.selectedSnapshot)
-            event.accepted = true
           }
         }
-        // Global panel actions
-        else if (event.key === Qt.Key_C || event.key === Qt.Key_N) {
-          root.openCreateModal()
-          event.accepted = true
-        } else if (event.key === Qt.Key_F || event.key === Qt.Key_Slash) {
-          searchInput.forceActiveFocus()
-          searchInput.selectAll()
-          event.accepted = true
-        } else if (event.key === Qt.Key_G) {
-          root.refresh()
-          event.accepted = true
-        } else if (event.key === Qt.Key_H || event.key === Qt.Key_Left) {
-          root.cycleFilter(-1)
-          event.accepted = true
-        } else if (event.key === Qt.Key_L || event.key === Qt.Key_Right) {
-          root.cycleFilter(1)
-          event.accepted = true
-        } else if (event.key === Qt.Key_1) {
-          root.currentFilter = "all"
-          event.accepted = true
-        } else if (event.key === Qt.Key_2) {
-          root.currentFilter = "update"
-          event.accepted = true
-        } else if (event.key === Qt.Key_3) {
-          root.currentFilter = "manual"
-          event.accepted = true
-        } else if (event.key === Qt.Key_4) {
-          root.currentFilter = "pinned"
-          event.accepted = true
-        } else if (event.key === Qt.Key_Q || event.key === Qt.Key_Escape) {
-          root.dismiss()
-          event.accepted = true
+
+        onTextKey: function(key, modifiers) {
+          var k = String(key || "").toLowerCase()
+          if (k === "c" || k === "n") {
+            root.openCreateModal()
+          } else if (k === "d") {
+            if (root.selectedSnapshot) root.inspectDiff(root.selectedSnapshot.id)
+          } else if (k === "b") {
+            if (root.selectedSnapshot) root.browseSnapshot(root.selectedSnapshot.id)
+          } else if (k === "p") {
+            if (root.selectedSnapshot) root.togglePin(root.selectedSnapshot.id, root.selectedSnapshot.important)
+          } else if (k === "r") {
+            if (root.showRestoreModal) root.executeRestore()
+            else if (root.selectedSnapshot) root.confirmRestore(root.selectedSnapshot)
+          } else if (k === "f" || key === "/") {
+            searchInput.forceActiveFocus()
+            searchInput.selectAll()
+          } else if (k === "g") {
+            root.refresh()
+          } else if (k === "q") {
+            if (root.showDiffModal) {
+              root.showDiffModal = false
+              keyCatcher.forceActiveFocus()
+            } else if (root.showCreateModal) {
+              root.showCreateModal = false
+              keyCatcher.forceActiveFocus()
+            } else if (root.showRestoreModal) {
+              root.showRestoreModal = false
+              keyCatcher.forceActiveFocus()
+            } else if (root.showDeleteModal) {
+              root.showDeleteModal = false
+              keyCatcher.forceActiveFocus()
+            } else {
+              root.dismiss()
+            }
+          } else if (key === "1") {
+            root.currentFilter = "all"
+          } else if (key === "2") {
+            root.currentFilter = "update"
+          } else if (key === "3") {
+            root.currentFilter = "manual"
+          } else if (key === "4") {
+            root.currentFilter = "pinned"
+          }
         }
+      }
+
+      // Background click returns active keyboard focus to keyCatcher
+      MouseArea {
+        anchors.fill: parent
+        z: -1
+        onClicked: keyCatcher.forceActiveFocus()
       }
 
       ColumnLayout {
@@ -967,7 +1028,7 @@ Item {
                 color: Color.muted
               }
 
-              TextInput {
+                TextInput {
                 id: searchInput
                 Layout.fillWidth: true
                 font.pixelSize: 11
@@ -976,14 +1037,14 @@ Item {
                 onTextChanged: root.searchQuery = text
                 Keys.onEscapePressed: {
                   searchInput.text = ""
-                  mainContainer.forceActiveFocus()
+                  keyCatcher.forceActiveFocus()
                 }
                 Keys.onDownPressed: {
-                  mainContainer.forceActiveFocus()
+                  keyCatcher.forceActiveFocus()
                   if (root.filteredSnapshots.length > 0) root.selectedIndex = 0
                 }
                 Keys.onReturnPressed: {
-                  mainContainer.forceActiveFocus()
+                  keyCatcher.forceActiveFocus()
                   if (root.filteredSnapshots.length > 0) root.selectedIndex = 0
                 }
 
@@ -1004,7 +1065,10 @@ Item {
                 MouseArea {
                   anchors.fill: parent
                   cursorShape: Qt.PointingHandCursor
-                  onClicked: searchInput.text = ""
+                  onClicked: {
+                    searchInput.text = ""
+                    keyCatcher.forceActiveFocus()
+                  }
                 }
               }
             }
@@ -1035,13 +1099,13 @@ Item {
                 spacing: 8
 
                 Text {
-                  anchors.horizontalCenter: parent.horizontalCenter
+                  Layout.alignment: Qt.AlignHCenter
                   text: "󰆼"
                   font.pixelSize: 36
                   color: Color.muted
                 }
                 Text {
-                  anchors.horizontalCenter: parent.horizontalCenter
+                  Layout.alignment: Qt.AlignHCenter
                   text: root.snapshotsList.length === 0 ? "No snapshots found on system." : "No snapshots match current filter."
                   font.pixelSize: 13
                   color: Color.muted
@@ -1068,7 +1132,10 @@ Item {
                 anchors.fill: parent
                 hoverEnabled: true
                 cursorShape: Qt.PointingHandCursor
-                onClicked: root.selectedIndex = index
+                onClicked: {
+                  root.selectedIndex = index
+                  keyCatcher.forceActiveFocus()
+                }
                 onDoubleClicked: root.inspectDiff(modelData.id)
               }
 
@@ -1091,14 +1158,14 @@ Item {
                     anchors.centerIn: parent
                     spacing: 0
                     Text {
-                      anchors.horizontalCenter: parent.horizontalCenter
+                      Layout.alignment: Qt.AlignHCenter
                       text: "#" + modelData.id
                       font.pixelSize: 13
                       font.weight: Font.Bold
                       color: modelData.important ? "#F59E0B" : Color.accent
                     }
                     Text {
-                      anchors.horizontalCenter: parent.horizontalCenter
+                      Layout.alignment: Qt.AlignHCenter
                       text: modelData.cleanup === "none" ? "keep" : "auto"
                       font.pixelSize: 9
                       color: Color.muted
@@ -1557,11 +1624,23 @@ Item {
                 color: Color.foreground
                 text: root.newSnapshotDesc
                 onTextChanged: root.newSnapshotDesc = text
-                focus: true
-                onAccepted: root.submitCreateSnapshot()
-                Keys.onReturnPressed: root.submitCreateSnapshot()
-                Keys.onEnterPressed: root.submitCreateSnapshot()
-                Keys.onEscapePressed: root.showCreateModal = false
+                focus: root.showCreateModal
+                onAccepted: {
+                  root.submitCreateSnapshot()
+                  keyCatcher.forceActiveFocus()
+                }
+                Keys.onReturnPressed: {
+                  root.submitCreateSnapshot()
+                  keyCatcher.forceActiveFocus()
+                }
+                Keys.onEnterPressed: {
+                  root.submitCreateSnapshot()
+                  keyCatcher.forceActiveFocus()
+                }
+                Keys.onEscapePressed: {
+                  root.showCreateModal = false
+                  keyCatcher.forceActiveFocus()
+                }
 
                 Text {
                   anchors.fill: parent
@@ -1668,6 +1747,7 @@ Item {
         }
 
         Rectangle {
+          id: diffModalCard
           anchors.centerIn: parent
           width: 720
           height: 520
@@ -1675,6 +1755,12 @@ Item {
           color: Color.background
           border.color: Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.4)
           border.width: 1
+          focus: root.showDiffModal
+
+          Keys.onEscapePressed: {
+            root.showDiffModal = false
+            keyCatcher.forceActiveFocus()
+          }
 
           MouseArea { anchors.fill: parent }
 
@@ -1759,11 +1845,17 @@ Item {
               border.width: 1
 
               TextInput {
+                id: diffFilterInput
                 anchors.fill: parent
                 anchors.margins: 8
                 font.pixelSize: 11
                 color: Color.foreground
                 onTextChanged: root.diffFilterQuery = text.trim().toLowerCase()
+                Keys.onEscapePressed: {
+                  if (text.length > 0) text = ""
+                  else root.showDiffModal = false
+                  keyCatcher.forceActiveFocus()
+                }
 
                 Text {
                   anchors.fill: parent
@@ -1861,7 +1953,10 @@ Item {
           border.width: 1
           focus: root.showRestoreModal
 
-          Keys.onEscapePressed: root.showRestoreModal = false
+          Keys.onEscapePressed: {
+            root.showRestoreModal = false
+            keyCatcher.forceActiveFocus()
+          }
           Keys.onReturnPressed: root.executeRestore()
           Keys.onEnterPressed: root.executeRestore()
 
@@ -1962,7 +2057,10 @@ Item {
           border.width: 1
           focus: root.showDeleteModal
 
-          Keys.onEscapePressed: root.showDeleteModal = false
+          Keys.onEscapePressed: {
+            root.showDeleteModal = false
+            keyCatcher.forceActiveFocus()
+          }
           Keys.onReturnPressed: root.executeDelete()
           Keys.onEnterPressed: root.executeDelete()
 

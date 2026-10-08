@@ -149,6 +149,19 @@ class TestQmlAndManifest(unittest.TestCase):
         self.assertIn("createDescInput", content)
         self.assertIn("restoreModalCard", content)
         self.assertIn("deleteModalCard", content)
+        self.assertIn("focus: root.showCreateModal", content)
+
+        # Standard Omarchy key catcher & focus scope integration
+        self.assertIn("PanelKeyCatcher", content)
+        self.assertIn("FocusScope", content)
+        self.assertIn("Keys.priority: Keys.BeforeItem", content)
+        self.assertIn("Keys.forwardTo: [navKeyHandler]", content)
+        self.assertIn("onMoveRequested", content)
+        self.assertIn("onActivateRequested", content)
+        self.assertIn("onCloseRequested", content)
+        self.assertIn("onDeleteRequested", content)
+        self.assertIn("onTextKey", content)
+        self.assertIn("keyCatcher.forceActiveFocus()", content)
 
         # Footer hint bar
         self.assertIn("Keyboard Shortcuts Footer Hint Bar", content)
