@@ -136,6 +136,23 @@ class TestSnapshotsCore(unittest.TestCase):
         self.assertNotEqual(res.returncode, 0)
         self.assertIn("--path is required", (res.stdout + res.stderr))
 
+    def test_mock_optimize_dry_run(self):
+        res = self.run_core(["optimize", "--mock"])
+        self.assertTrue(res.get("ok"))
+        self.assertFalse(res.get("executed"))
+        self.assertEqual(res.get("totalSnapshots"), 6)
+        self.assertEqual(res.get("prunableCount"), 3)
+        self.assertIn("reclaimableHuman", res)
+        self.assertIn("retentionPolicy", res)
+
+    def test_mock_optimize_execute(self):
+        res = self.run_core(["optimize", "--execute", "--mock"])
+        self.assertTrue(res.get("ok"))
+        self.assertTrue(res.get("executed"))
+        self.assertEqual(res.get("prunedCount"), 3)
+        self.assertEqual(res.get("prunedIds"), [16, 15, 14])
+        self.assertIn("freedHuman", res)
+
     def test_user_cli_list(self):
         res = subprocess.run([CLI_BIN, "list", "--mock"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
         self.assertEqual(res.returncode, 0)

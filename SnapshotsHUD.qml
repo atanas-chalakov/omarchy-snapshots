@@ -53,6 +53,10 @@ Item {
   property string activeRestoreFilePath: ""
   property int activeRestoreFileSnapshotId: 0
 
+  property bool showOptimizeModal: false
+  property var activeOptimizeData: null
+  property bool isOptimizing: false
+
   function notify(msg) {
     statusNotification = msg
     notifyTimer.restart()
@@ -256,6 +260,26 @@ Item {
     restoreFileProcess.running = true
   }
 
+  function openOptimizeModal() {
+    showOptimizeModal = true
+    notify("Evaluating Btrfs retention guards and calculating reclaimable space...")
+    var args = [coreScript, "optimize"]
+    if (useMockData) args.push("--mock")
+    if (estimateOptimizeProcess.running) estimateOptimizeProcess.running = false
+    estimateOptimizeProcess.command = args
+    estimateOptimizeProcess.running = true
+  }
+
+  function executeOptimize() {
+    isOptimizing = true
+    notify("Safely pruning stale snapshots and reclaiming space...")
+    var args = [coreScript, "optimize", "--execute"]
+    if (useMockData) args.push("--mock")
+    if (executeOptimizeProcess.running) executeOptimizeProcess.running = false
+    executeOptimizeProcess.command = args
+    executeOptimizeProcess.running = true
+  }
+
   function authorizeAccess() {
     notify("Requesting authorization for passwordless access...")
     authProcess.command = [coreScript, "authorize"]
@@ -272,6 +296,7 @@ Item {
         var parsed = JSON.parse(String(payloadJson))
         if (parsed.mock === true) root.useMockData = true
         if (parsed.action === "create") root.openCreateModal(parsed.desc || "")
+        if (parsed.action === "optimize") root.openOptimizeModal()
         if (parsed.action === "diff") {
           Qt.callLater(function() { root.inspectDiff(parsed.id || 19) })
         }
@@ -415,6 +440,47 @@ Item {
   }
 
   Process {
+    id: estimateOptimizeProcess
+    stdout: StdioCollector {
+      waitForEnd: true
+      onStreamFinished: {
+        try {
+          var res = JSON.parse(text)
+          if (res.ok) {
+            root.activeOptimizeData = res
+          } else {
+            root.notify("Optimization estimate failed: " + (res.error || "Unknown error"))
+          }
+        } catch(e) {}
+      }
+    }
+  }
+
+  Process {
+    id: executeOptimizeProcess
+    stdout: StdioCollector {
+      waitForEnd: true
+      onStreamFinished: {
+        root.isOptimizing = false
+        try {
+          var res = JSON.parse(text)
+          if (res.ok) {
+            root.showOptimizeModal = false
+            root.notify(res.message || "Disk optimization completed!")
+            root.refresh()
+          } else {
+            root.notify("Optimization failed: " + (res.error || "Failed"))
+          }
+        } catch(e) {
+          root.showOptimizeModal = false
+          root.notify("Optimization completed.")
+          root.refresh()
+        }
+      }
+    }
+  }
+
+  Process {
     id: authProcess
     stdout: StdioCollector {
       waitForEnd: true
@@ -549,11 +615,18 @@ Item {
           } else if (event.key === Qt.Key_4) {
             root.currentFilter = "pinned"
             event.accepted = true
+          } else if (event.key === Qt.Key_O) {
+            root.openOptimizeModal()
+            event.accepted = true
           } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
             if (root.showRestoreModal) {
               root.executeRestore()
             } else if (root.showDeleteModal) {
               root.executeDelete()
+            } else if (root.showRestoreFileModal) {
+              root.executeRestoreFile()
+            } else if (root.showOptimizeModal) {
+              root.executeOptimize()
             } else if (root.selectedSnapshot) {
               root.inspectDiff(root.selectedSnapshot.id)
             }
@@ -570,6 +643,12 @@ Item {
               keyCatcher.forceActiveFocus()
             } else if (root.showDeleteModal) {
               root.showDeleteModal = false
+              keyCatcher.forceActiveFocus()
+            } else if (root.showRestoreFileModal) {
+              root.showRestoreFileModal = false
+              keyCatcher.forceActiveFocus()
+            } else if (root.showOptimizeModal) {
+              root.showOptimizeModal = false
               keyCatcher.forceActiveFocus()
             } else {
               root.dismiss()
@@ -1095,6 +1174,52 @@ Item {
                 text: parent.syncActive ? "Limine Boot Sync Active" : "Boot Sync Offline"
                 font.pixelSize: 11
                 color: parent.syncActive ? Color.muted : "#EF4444"
+              }
+            }
+
+            // Optimize Disk Button Chip
+            Rectangle {
+              id: optimizeDiskBtn
+              implicitHeight: 26
+              implicitWidth: optBtnRow.implicitWidth + 14
+              radius: 6
+              color: optMouse.containsMouse ? Qt.rgba(0.06, 0.72, 0.51, 0.22) : Qt.rgba(0.06, 0.72, 0.51, 0.12)
+              border.color: optMouse.containsMouse ? "#10B981" : Qt.rgba(0.06, 0.72, 0.51, 0.3)
+              border.width: 1
+
+              MouseArea {
+                id: optMouse
+                anchors.fill: parent
+                hoverEnabled: true
+                cursorShape: Qt.PointingHandCursor
+                onClicked: root.openOptimizeModal()
+              }
+
+              RowLayout {
+                id: optBtnRow
+                anchors.centerIn: parent
+                spacing: 5
+                Text { text: "󰚰"; font.pixelSize: 12; color: "#10B981" }
+                Text {
+                  text: "Optimize Disk"
+                  font.pixelSize: 11
+                  font.weight: Font.DemiBold
+                  color: "#10B981"
+                }
+                Rectangle {
+                  implicitHeight: 14
+                  implicitWidth: keyOptTxt.implicitWidth + 4
+                  radius: 2
+                  color: Qt.rgba(0, 0, 0, 0.2)
+                  Text {
+                    id: keyOptTxt
+                    anchors.centerIn: parent
+                    text: "O"
+                    font.pixelSize: 8
+                    font.weight: Font.Bold
+                    color: "#10B981"
+                  }
+                }
               }
             }
           }
@@ -1990,6 +2115,35 @@ Item {
                   Text { id: keyTxt9; anchors.centerIn: parent; text: "G"; font.pixelSize: 9; font.weight: Font.Bold; color: Color.foreground }
                 }
                 Text { text: "Refresh"; font.pixelSize: 10; color: Color.muted }
+              }
+            }
+
+            // Hint: Optimize
+            Rectangle {
+              id: hintOptimizePill
+              implicitHeight: 24
+              implicitWidth: hOptLayout.implicitWidth + 10
+              radius: 4
+              color: hOptMouse.containsMouse ? Qt.rgba(0.06, 0.72, 0.51, 0.12) : "transparent"
+              MouseArea {
+                id: hOptMouse
+                anchors.fill: parent
+                hoverEnabled: true
+                cursorShape: Qt.PointingHandCursor
+                onClicked: { root.openOptimizeModal(); keyCatcher.forceActiveFocus() }
+              }
+              RowLayout {
+                id: hOptLayout
+                anchors.centerIn: parent
+                spacing: 4
+                Rectangle {
+                  implicitHeight: 17
+                  implicitWidth: keyTxtOpt.implicitWidth + 6
+                  radius: 3
+                  color: Qt.rgba(0.06, 0.72, 0.51, 0.2)
+                  Text { id: keyTxtOpt; anchors.centerIn: parent; text: "O"; font.pixelSize: 9; font.weight: Font.Bold; color: "#10B981" }
+                }
+                Text { text: "Optimize"; font.pixelSize: 10; color: Color.muted }
               }
             }
 
@@ -3084,6 +3238,378 @@ Item {
                   font.pixelSize: 12
                   font.weight: Font.Bold
                   color: "#181825"
+                }
+              }
+            }
+          }
+        }
+      }
+
+      // ==========================================
+      // MODAL 6: SMART DISK OPTIMIZER & RETENTION GUARD
+      // ==========================================
+      Rectangle {
+        visible: root.showOptimizeModal
+        anchors.fill: parent
+        color: Qt.rgba(0, 0, 0, 0.75)
+
+        MouseArea {
+          anchors.fill: parent
+          onClicked: {
+            if (!root.isOptimizing) root.showOptimizeModal = false
+          }
+        }
+
+        Rectangle {
+          id: optimizeModalCard
+          anchors.centerIn: parent
+          width: 580
+          implicitHeight: Math.min(540, optimizeCol.implicitHeight + 40)
+          radius: 12
+          color: Color.background
+          border.color: "#10B981"
+          border.width: 1
+          focus: root.showOptimizeModal
+
+          Keys.onEscapePressed: {
+            if (!root.isOptimizing) {
+              root.showOptimizeModal = false
+              keyCatcher.forceActiveFocus()
+            }
+          }
+          Keys.onReturnPressed: {
+            if (!root.isOptimizing && root.activeOptimizeData && root.activeOptimizeData.prunableCount > 0) {
+              root.executeOptimize()
+            }
+          }
+          Keys.onEnterPressed: {
+            if (!root.isOptimizing && root.activeOptimizeData && root.activeOptimizeData.prunableCount > 0) {
+              root.executeOptimize()
+            }
+          }
+
+          MouseArea { anchors.fill: parent }
+
+          ColumnLayout {
+            id: optimizeCol
+            anchors.fill: parent
+            anchors.margins: 20
+            spacing: 14
+
+            // Title & Icon
+            RowLayout {
+              spacing: 10
+              Text { text: "󰚰"; font.pixelSize: 22; color: "#10B981" }
+              ColumnLayout {
+                spacing: 2
+                Text {
+                  text: "Smart Btrfs Disk Optimizer"
+                  font.pixelSize: 16
+                  font.weight: Font.Bold
+                  color: Color.foreground
+                }
+                Text {
+                  text: (root.activeOptimizeData && root.activeOptimizeData.retentionPolicy) || "Analyzing retention guards and space reclamation..."
+                  font.pixelSize: 11
+                  color: Color.muted
+                }
+              }
+            }
+
+            // Stat tiles grid
+            RowLayout {
+              Layout.fillWidth: true
+              spacing: 8
+
+              // Tile 1: Total
+              Rectangle {
+                Layout.fillWidth: true
+                implicitHeight: 48
+                radius: 6
+                color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.04)
+                border.color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.08)
+                ColumnLayout {
+                  anchors.centerIn: parent
+                  spacing: 2
+                  Text {
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    text: String((root.activeOptimizeData && root.activeOptimizeData.totalSnapshots) || 0)
+                    font.pixelSize: 15
+                    font.weight: Font.Bold
+                    color: Color.foreground
+                  }
+                  Text {
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    text: "Total Points"
+                    font.pixelSize: 9
+                    color: Color.muted
+                  }
+                }
+              }
+
+              // Tile 2: Protected
+              Rectangle {
+                Layout.fillWidth: true
+                implicitHeight: 48
+                radius: 6
+                color: Qt.rgba(0.06, 0.72, 0.51, 0.08)
+                border.color: Qt.rgba(0.06, 0.72, 0.51, 0.25)
+                ColumnLayout {
+                  anchors.centerIn: parent
+                  spacing: 2
+                  Text {
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    text: String((root.activeOptimizeData && root.activeOptimizeData.protectedCount) || 0)
+                    font.pixelSize: 15
+                    font.weight: Font.Bold
+                    color: "#10B981"
+                  }
+                  Text {
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    text: "🛡️ Protected"
+                    font.pixelSize: 9
+                    color: "#10B981"
+                  }
+                }
+              }
+
+              // Tile 3: Prunable
+              Rectangle {
+                Layout.fillWidth: true
+                implicitHeight: 48
+                radius: 6
+                color: Qt.rgba(0.96, 0.62, 0.04, 0.08)
+                border.color: Qt.rgba(0.96, 0.62, 0.04, 0.25)
+                ColumnLayout {
+                  anchors.centerIn: parent
+                  spacing: 2
+                  Text {
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    text: String((root.activeOptimizeData && root.activeOptimizeData.prunableCount) || 0)
+                    font.pixelSize: 15
+                    font.weight: Font.Bold
+                    color: "#F59E0B"
+                  }
+                  Text {
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    text: "🧹 Prunable Stale"
+                    font.pixelSize: 9
+                    color: "#F59E0B"
+                  }
+                }
+              }
+
+              // Tile 4: Potential Reclaim
+              Rectangle {
+                Layout.fillWidth: true
+                implicitHeight: 48
+                radius: 6
+                color: Qt.rgba(0.06, 0.72, 0.51, 0.15)
+                border.color: "#10B981"
+                ColumnLayout {
+                  anchors.centerIn: parent
+                  spacing: 2
+                  Text {
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    text: (root.activeOptimizeData && root.activeOptimizeData.reclaimableHuman) ? ("~" + root.activeOptimizeData.reclaimableHuman) : "0 B"
+                    font.pixelSize: 15
+                    font.weight: Font.Bold
+                    color: "#10B981"
+                  }
+                  Text {
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    text: "💾 Est. Reclaim"
+                    font.pixelSize: 9
+                    font.weight: Font.Bold
+                    color: "#10B981"
+                  }
+                }
+              }
+            }
+
+            // Safety Guard Policy banner
+            Rectangle {
+              Layout.fillWidth: true
+              implicitHeight: guardCol.implicitHeight + 14
+              radius: 6
+              color: Qt.rgba(0.06, 0.72, 0.51, 0.05)
+              border.color: Qt.rgba(0.06, 0.72, 0.51, 0.2)
+              border.width: 1
+
+              ColumnLayout {
+                id: guardCol
+                anchors.fill: parent
+                anchors.margins: 10
+                spacing: 4
+                RowLayout {
+                  spacing: 6
+                  Text { text: "🛡️"; font.pixelSize: 12 }
+                  Text {
+                    text: "Safe Retention Guard Active"
+                    font.pixelSize: 11
+                    font.weight: Font.Bold
+                    color: "#10B981"
+                  }
+                }
+                Text {
+                  text: "Pinned checkpoints (📌), the newest system state, and recent recovery points are strictly locked against pruning. Only stale checkpoints outside retention limits will be reclaimed."
+                  font.pixelSize: 10
+                  color: Color.muted
+                  wrapMode: Text.WordWrap
+                  Layout.fillWidth: true
+                }
+              }
+            }
+
+            // Prunable Candidates Subhead
+            Text {
+              text: "Eligible Stale Snapshots for Reclaim:"
+              font.pixelSize: 12
+              font.weight: Font.Bold
+              color: Color.foreground
+            }
+
+            // Prunable Candidates List
+            ScrollView {
+              Layout.fillWidth: true
+              implicitHeight: 130
+              clip: true
+
+              ListView {
+                width: parent.width
+                spacing: 4
+                model: (root.activeOptimizeData && root.activeOptimizeData.prunableSnapshots) || []
+
+                // Empty state if no prunable
+                Item {
+                  visible: parent.count === 0
+                  anchors.centerIn: parent
+                  width: parent.width
+                  height: 90
+                  ColumnLayout {
+                    anchors.centerIn: parent
+                    spacing: 4
+                    Text { Layout.alignment: Qt.AlignHCenter; text: "✔"; font.pixelSize: 22; color: "#10B981" }
+                    Text {
+                      Layout.alignment: Qt.AlignHCenter
+                      text: "All recovery points are protected or recent. Storage is fully optimized!"
+                      font.pixelSize: 11
+                      color: Color.muted
+                    }
+                  }
+                }
+
+                delegate: Rectangle {
+                  width: parent.width
+                  implicitHeight: 30
+                  radius: 4
+                  color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.02)
+                  border.color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.06)
+
+                  RowLayout {
+                    anchors.fill: parent
+                    anchors.margins: 6
+                    spacing: 8
+
+                    Text {
+                      text: "#" + modelData.id
+                      font.pixelSize: 11
+                      font.weight: Font.Bold
+                      color: Color.foreground
+                    }
+
+                    Text {
+                      text: modelData.description || ""
+                      font.pixelSize: 11
+                      color: Color.muted
+                      Layout.fillWidth: true
+                      elide: Text.ElideRight
+                    }
+
+                    Text {
+                      text: modelData.age || ""
+                      font.pixelSize: 10
+                      color: Color.muted
+                    }
+
+                    Rectangle {
+                      implicitHeight: 18
+                      implicitWidth: estTxt.implicitWidth + 8
+                      radius: 3
+                      color: Qt.rgba(0.06, 0.72, 0.51, 0.15)
+                      Text {
+                        id: estTxt
+                        anchors.centerIn: parent
+                        text: "~" + (modelData.estimatedHuman || "")
+                        font.pixelSize: 9
+                        font.weight: Font.Bold
+                        color: "#10B981"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+
+            // Bottom action buttons
+            RowLayout {
+              Layout.fillWidth: true
+              spacing: 10
+              Item { Layout.fillWidth: true }
+
+              Rectangle {
+                implicitHeight: 34
+                implicitWidth: 80
+                radius: 6
+                color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.08)
+                MouseArea {
+                  anchors.fill: parent
+                  cursorShape: Qt.PointingHandCursor
+                  onClicked: {
+                    if (!root.isOptimizing) root.showOptimizeModal = false
+                  }
+                }
+                Text {
+                  anchors.centerIn: parent
+                  text: "Cancel"
+                  font.pixelSize: 12
+                  color: Color.muted
+                }
+              }
+
+              Rectangle {
+                implicitHeight: 34
+                implicitWidth: 180
+                radius: 6
+                color: (root.activeOptimizeData && root.activeOptimizeData.prunableCount > 0 && !root.isOptimizing) ? "#10B981" : Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.1)
+                opacity: (root.activeOptimizeData && root.activeOptimizeData.prunableCount > 0 && !root.isOptimizing) ? 1.0 : 0.6
+
+                MouseArea {
+                  anchors.fill: parent
+                  cursorShape: (root.activeOptimizeData && root.activeOptimizeData.prunableCount > 0 && !root.isOptimizing) ? Qt.PointingHandCursor : Qt.ArrowCursor
+                  onClicked: {
+                    if (root.activeOptimizeData && root.activeOptimizeData.prunableCount > 0 && !root.isOptimizing) {
+                      root.executeOptimize()
+                    }
+                  }
+                }
+
+                RowLayout {
+                  anchors.centerIn: parent
+                  spacing: 6
+                  Text {
+                    text: root.isOptimizing ? "󰑐" : "󰚰"
+                    font.pixelSize: 13
+                    color: (root.activeOptimizeData && root.activeOptimizeData.prunableCount > 0 && !root.isOptimizing) ? "#181825" : Color.muted
+                    rotation: root.isOptimizing ? 180 : 0
+                    Behavior on rotation { NumberAnimation { duration: 400 } }
+                  }
+                  Text {
+                    text: root.isOptimizing ? "Pruning Snapshots..." : "Clean & Reclaim Space"
+                    font.pixelSize: 12
+                    font.weight: Font.Bold
+                    color: (root.activeOptimizeData && root.activeOptimizeData.prunableCount > 0 && !root.isOptimizing) ? "#181825" : Color.muted
+                  }
                 }
               }
             }

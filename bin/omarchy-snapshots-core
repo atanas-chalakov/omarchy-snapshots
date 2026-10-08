@@ -762,6 +762,151 @@ def restore_file(snap_id, file_path, config="root", mock=False):
         "message": f"Successfully restored {clean_path} from snapshot #{snap_id}." + (f" Safety backup created at {backup_path}." if target_exists else "")
     }
 
+def optimize_snapshots(config="root", keep=3, max_age_days=14, execute=False, mock=False):
+    """
+    Evaluates snapshots against safe retention guards and calculates reclaimable space.
+    If execute=True, prunes eligible stale snapshots safely.
+    Guards:
+      - Always protects pinned (important) snapshots.
+      - Always protects the newest snapshot.
+      - Always protects at least `keep` most recent snapshots.
+      - Protects snapshots within max_age_days.
+    """
+    if mock:
+        prunable = [
+            {"id": 16, "description": "Timeline auto-checkpoint", "age": "2w ago", "estimatedBytes": 2415919104, "estimatedHuman": "2.3 GiB"},
+            {"id": 15, "description": "Pre-Update (mesa 24.2.1)", "age": "3w ago", "estimatedBytes": 2791728742, "estimatedHuman": "2.6 GiB"},
+            {"id": 14, "description": "Timeline auto-checkpoint", "age": "4w ago", "estimatedBytes": 1717986918, "estimatedHuman": "1.6 GiB"}
+        ]
+        protected = [
+            {"id": 19, "description": "Pre-Update (omarchy 4.0.2)", "reason": "Latest recovery point"},
+            {"id": 18, "description": "System Baseline", "reason": "Pinned (Important)"},
+            {"id": 17, "description": "Manual checkpoint", "reason": "Recent retention guard"}
+        ]
+        total_reclaim = sum(p["estimatedBytes"] for p in prunable)
+        if execute:
+            return {
+                "ok": True,
+                "executed": True,
+                "prunedCount": len(prunable),
+                "prunedIds": [p["id"] for p in prunable],
+                "freedBytes": total_reclaim,
+                "freedHuman": format_bytes(total_reclaim),
+                "message": f"Successfully pruned {len(prunable)} stale snapshots, reclaiming ~{format_bytes(total_reclaim)}."
+            }
+        return {
+            "ok": True,
+            "executed": False,
+            "totalSnapshots": len(prunable) + len(protected),
+            "protectedCount": len(protected),
+            "prunableCount": len(prunable),
+            "reclaimableBytes": total_reclaim,
+            "reclaimableHuman": format_bytes(total_reclaim),
+            "prunableSnapshots": prunable,
+            "protectedSnapshots": protected,
+            "retentionPolicy": f"Preserves {keep} latest snapshots and all pinned checkpoints (> {max_age_days}d stale threshold)."
+        }
+
+    # Live Mode
+    st = get_live_status()
+    all_snaps = []
+    for cfg in st.get("configs", []):
+        if cfg.get("name") == config or not config:
+            all_snaps = cfg.get("snapshots", [])
+            break
+
+    if not all_snaps:
+        return {
+            "ok": True,
+            "executed": execute,
+            "totalSnapshots": 0,
+            "protectedCount": 0,
+            "prunableCount": 0,
+            "reclaimableBytes": 0,
+            "reclaimableHuman": "0 B",
+            "prunableSnapshots": [],
+            "protectedSnapshots": [],
+            "message": "No snapshots found to evaluate."
+        }
+
+    # Sort descending by ID
+    sorted_snaps = sorted(all_snaps, key=lambda x: x.get("id", 0), reverse=True)
+    now = int(time.time())
+    max_age_secs = max_age_days * 86400
+
+    prunable = []
+    protected = []
+
+    for i, s in enumerate(sorted_snaps):
+        snap_id = s.get("id")
+        desc = s.get("description", "")
+        age_str = s.get("relativeAge", "")
+        epoch = s.get("epoch", 0)
+        is_pinned = s.get("important") is True
+
+        if i == 0:
+            protected.append({"id": snap_id, "description": desc, "reason": "Latest recovery point"})
+        elif is_pinned:
+            protected.append({"id": snap_id, "description": desc, "reason": "Pinned (Important)"})
+        elif i < keep:
+            protected.append({"id": snap_id, "description": desc, "reason": f"Recent retention guard (Top {keep})"})
+        elif epoch and (now - epoch < max_age_secs):
+            protected.append({"id": snap_id, "description": desc, "reason": f"Within {max_age_days}d retention window"})
+        else:
+            # Stale candidate
+            pkg_cnt = s.get("packageCount", 0)
+            est_bytes = int(1024 * 1024 * 1024 * (1.2 + min(3.0, pkg_cnt * 0.1)))
+            prunable.append({
+                "id": snap_id,
+                "description": desc,
+                "age": age_str,
+                "estimatedBytes": est_bytes,
+                "estimatedHuman": format_bytes(est_bytes)
+            })
+
+    total_reclaim = sum(p["estimatedBytes"] for p in prunable)
+
+    if execute:
+        pruned_ids = []
+        errors = []
+        for p in prunable:
+            d_res = delete_snapshot(p["id"], config=config, mock=False)
+            if d_res.get("ok"):
+                pruned_ids.append(p["id"])
+            else:
+                errors.append(f"#{p['id']}: {d_res.get('error')}")
+
+        freed_sum = sum(p["estimatedBytes"] for p in prunable if p["id"] in pruned_ids)
+        if errors and not pruned_ids:
+            return {"ok": False, "error": "; ".join(errors)}
+
+        msg = f"Successfully pruned {len(pruned_ids)} stale snapshots, reclaiming ~{format_bytes(freed_sum)}."
+        if errors:
+            msg += f" (Note: {len(errors)} snapshots failed: {'; '.join(errors)})"
+
+        return {
+            "ok": True,
+            "executed": True,
+            "prunedCount": len(pruned_ids),
+            "prunedIds": pruned_ids,
+            "freedBytes": freed_sum,
+            "freedHuman": format_bytes(freed_sum),
+            "message": msg
+        }
+
+    return {
+        "ok": True,
+        "executed": False,
+        "totalSnapshots": len(sorted_snaps),
+        "protectedCount": len(protected),
+        "prunableCount": len(prunable),
+        "reclaimableBytes": total_reclaim,
+        "reclaimableHuman": format_bytes(total_reclaim),
+        "prunableSnapshots": prunable,
+        "protectedSnapshots": protected,
+        "retentionPolicy": f"Preserves {keep} latest snapshots and all pinned checkpoints (> {max_age_days}d stale threshold)."
+    }
+
 def authorize_access(config="root"):
     """Grants the wheel group permissions in snapper config and /.snapshots permissions."""
     # 1. snapper set-config ALLOW_GROUPS="wheel"
@@ -778,13 +923,16 @@ def authorize_access(config="root"):
 
 def main():
     parser = argparse.ArgumentParser(description="Omarchy Snapshots Backend Core")
-    parser.add_argument("command", choices=["status", "create", "delete", "pin", "unpin", "diff", "authorize", "restore", "packages", "restore-file"], help="Action to execute")
+    parser.add_argument("command", choices=["status", "create", "delete", "pin", "unpin", "diff", "authorize", "restore", "packages", "restore-file", "optimize"], help="Action to execute")
     parser.add_argument("--mock", action="store_true", help="Output mock data for testing or preview")
     parser.add_argument("--config", default="root", help="Snapper config name (default: root)")
     parser.add_argument("--desc", default="", help="Description for snapshot creation")
     parser.add_argument("--id", type=int, help="Snapshot ID for operations")
     parser.add_argument("--path", default="", help="File path for single-file rollback")
     parser.add_argument("--important", action="store_true", help="Mark snapshot as important (pinned)")
+    parser.add_argument("--execute", action="store_true", help="Execute optimization pruning instead of dry-run preview")
+    parser.add_argument("--keep", type=int, default=3, help="Number of recent snapshots to protect (default: 3)")
+    parser.add_argument("--days", type=int, default=14, help="Maximum age threshold in days before considered stale (default: 14)")
 
     args = parser.parse_args()
 
@@ -857,6 +1005,10 @@ def main():
             print(json.dumps({"ok": False, "error": "--path is required for restore-file"}))
             sys.exit(1)
         res = restore_file(args.id, args.path, config=args.config, mock=args.mock)
+        print(json.dumps(res, indent=2))
+        sys.exit(0 if res.get("ok") else 1)
+    elif args.command == "optimize":
+        res = optimize_snapshots(config=args.config, keep=args.keep, max_age_days=args.days, execute=args.execute, mock=args.mock)
         print(json.dumps(res, indent=2))
         sys.exit(0 if res.get("ok") else 1)
     elif args.command == "authorize":

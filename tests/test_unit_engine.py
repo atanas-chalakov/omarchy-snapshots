@@ -254,6 +254,36 @@ class TestUnitEngine(unittest.TestCase):
         self.assertFalse(res["ok"])
         self.assertIn("not found", res["error"].lower())
 
+    def test_optimize_snapshots_mock_dry_run(self):
+        res = core.optimize_snapshots(mock=True, execute=False)
+        self.assertTrue(res["ok"])
+        self.assertFalse(res["executed"])
+        self.assertEqual(res["totalSnapshots"], 6)
+        self.assertEqual(res["protectedCount"], 3)
+        self.assertEqual(res["prunableCount"], 3)
+        self.assertGreater(res["reclaimableBytes"], 0)
+        self.assertIn("GiB", res["reclaimableHuman"])
+        self.assertEqual(len(res["prunableSnapshots"]), 3)
+        self.assertEqual(len(res["protectedSnapshots"]), 3)
+        self.assertIn("Preserves 3 latest snapshots", res["retentionPolicy"])
+
+    def test_optimize_snapshots_mock_execute(self):
+        res = core.optimize_snapshots(mock=True, execute=True)
+        self.assertTrue(res["ok"])
+        self.assertTrue(res["executed"])
+        self.assertEqual(res["prunedCount"], 3)
+        self.assertEqual(res["prunedIds"], [16, 15, 14])
+        self.assertIn("GiB", res["freedHuman"])
+        self.assertIn("Successfully pruned 3 stale snapshots", res["message"])
+
+    def test_optimize_snapshots_live_dry_run(self):
+        res = core.optimize_snapshots(mock=False, execute=False)
+        self.assertTrue(res["ok"])
+        self.assertFalse(res["executed"])
+        self.assertIn("totalSnapshots", res)
+        self.assertIn("protectedCount", res)
+        self.assertIn("prunableCount", res)
+
     def test_live_status_safe_read(self):
         # Querying live status on current system should not crash and should parse snapshots cleanly
         st = core.get_live_status()

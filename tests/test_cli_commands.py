@@ -111,6 +111,20 @@ class TestCliCommands(unittest.TestCase):
         self.assertIn("Safety Bak:", res.stdout)
         self.assertIn("/etc/hypr/hyprland.conf", res.stdout)
 
+    def test_cli_optimize_mock_preview(self):
+        res = self.run_cmd(CLI_BIN, ["optimize", "--mock"])
+        self.assertEqual(res.returncode, 0)
+        self.assertIn("Smart Btrfs Disk Optimizer", res.stdout)
+        self.assertIn("Potential Reclaim", res.stdout)
+        self.assertIn("Timeline auto-checkpoint", res.stdout)
+
+    def test_cli_optimize_mock_execute(self):
+        res = self.run_cmd(CLI_BIN, ["optimize", "--execute", "--mock"])
+        self.assertEqual(res.returncode, 0)
+        self.assertIn("Smart Disk Optimization Complete!", res.stdout)
+        self.assertIn("Pruned Snapshots", res.stdout)
+        self.assertIn("Reclaimed Space", res.stdout)
+
     # Error handling test cases
     def test_missing_id_diff(self):
         res = self.run_cmd(CLI_BIN, ["diff", "--mock"])

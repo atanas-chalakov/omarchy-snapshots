@@ -62,12 +62,15 @@ def print_table(data):
 
 def main():
     parser = argparse.ArgumentParser(description="Omarchy Snapshots CLI")
-    parser.add_argument("command", nargs="?", default="list", choices=["list", "create", "delete", "pin", "unpin", "diff", "authorize", "json", "gui", "toggle", "open", "show", "restore", "packages", "restore-file"], help="Command to run")
-    parser.add_argument("--action", choices=["create", "diff", "restore"], help="Initial action for HUD")
+    parser.add_argument("command", nargs="?", default="list", choices=["list", "create", "delete", "pin", "unpin", "diff", "authorize", "json", "gui", "toggle", "open", "show", "restore", "packages", "restore-file", "optimize"], help="Command to run")
+    parser.add_argument("--action", choices=["create", "diff", "restore", "optimize"], help="Initial action for HUD")
     parser.add_argument("--desc", default="", help="Description for new snapshot")
     parser.add_argument("--id", type=int, help="Snapshot ID")
     parser.add_argument("--path", default="", help="File path for single-file rollback")
     parser.add_argument("--important", action="store_true", help="Pin snapshot against auto-cleanup")
+    parser.add_argument("--execute", action="store_true", help="Execute optimization pruning instead of dry-run preview")
+    parser.add_argument("--keep", type=int, default=3, help="Number of recent snapshots to protect (default: 3)")
+    parser.add_argument("--days", type=int, default=14, help="Maximum age threshold in days before considered stale (default: 14)")
     parser.add_argument("--mock", action="store_true", help="Use mock data")
 
     args = parser.parse_args()
@@ -229,13 +232,55 @@ def main():
         else:
             print(f"\033[1;31m✗\033[0m {res.get('error', 'Single-file rollback failed.')}")
             sys.exit(1)
+    elif args.command == "optimize":
+        core_args = ["optimize", "--keep", str(args.keep), "--days", str(args.days)]
+        if args.execute:
+            core_args.append("--execute")
+        if args.mock:
+            core_args.append("--mock")
+        res = run_core(core_args)
+        if not res.get("ok"):
+            print(f"\033[1;31m✗\033[0m {res.get('error', 'Optimization failed')}")
+            sys.exit(1)
+
+        if res.get("executed"):
+            print(f"\n\033[1;32m✔ Smart Disk Optimization Complete!\033[0m")
+            print(f"  \033[1mPruned Snapshots:\033[0m  {res.get('prunedCount', 0)} ({', '.join(f'#{i}' for i in res.get('prunedIds', []))})")
+            print(f"  \033[1;36mReclaimed Space:\033[0m   ~{res.get('freedHuman', '0 B')}\n")
+            sys.exit(0)
+
+        # Dry-run preview
+        reclaim_str = res.get("reclaimableHuman", "0 B")
+        prunable = res.get("prunableSnapshots", [])
+        protected = res.get("protectedSnapshots", [])
+        print(f"\n\033[1;36m🧹 Smart Btrfs Disk Optimizer & Safe Retention Guard\033[0m")
+        print(f"Policy: {res.get('retentionPolicy', '')}\n")
+        print(f"  📦 Total Snapshots:    {res.get('totalSnapshots', 0)}")
+        print(f"  🛡️ Protected:          {res.get('protectedCount', 0)}")
+        print(f"  🧹 Prunable Stale:     {res.get('prunableCount', 0)}")
+        print(f"  💾 Potential Reclaim:  \033[1;32m~{reclaim_str}\033[0m\n")
+
+        if prunable:
+            print("┌──────┬───────────────┬──────────────────────────────────┬────────────────────────┐")
+            print("│   ID │ AGE           │ DESCRIPTION                      │ ESTIMATED RECLAIM      │")
+            print("├──────┼───────────────┼──────────────────────────────────┼────────────────────────┤")
+            for p in prunable:
+                desc = p.get("description", "")
+                if len(desc) > 32:
+                    desc = desc[:29] + "..."
+                print(f"│ {p.get('id'):>4} │ {p.get('age', ''):<13} │ {desc:<32} │ ~{p.get('estimatedHuman', ''):<22} │")
+            print("└──────┴───────────────┴──────────────────────────────────┴────────────────────────┘")
+            print("\nTo safely prune these snapshots and reclaim space, run:")
+            print(f"  \033[1;33momarchy-snapshots optimize --execute\033[0m\n")
+        else:
+            print("  \033[1;32m✔ Your snapshot storage is already fully optimized! No stale snapshots found.\033[0m\n")
     elif args.command == "authorize":
         res = run_core(["authorize"])
         if res.get("ok"):
             print(f"\033[1;32m✓\033[0m {res.get('message')}")
         else:
             print(f"\033[1;31m✗\033[0m {res.get('error')}")
-            sys.exit(1)
+        sys.exit(1)
 
 if __name__ == "__main__":
     main()

@@ -150,6 +150,29 @@ class TestQmlAndManifest(unittest.TestCase):
         self.assertIn("Roll Back File from Snapshot", content)
         self.assertIn("Safety Guarantee: Automatic Backup", content)
 
+    def test_optimizer_ui_components(self):
+        hud_path = os.path.join(PROJECT_ROOT, "SnapshotsHUD.qml")
+        with open(hud_path, "r", encoding="utf-8") as f:
+            content = f.read()
+
+        # Optimizer properties and methods
+        self.assertIn("property bool showOptimizeModal", content)
+        self.assertIn("property var activeOptimizeData", content)
+        self.assertIn("function openOptimizeModal()", content)
+        self.assertIn("function executeOptimize()", content)
+        self.assertIn("estimateOptimizeProcess", content)
+        self.assertIn("executeOptimizeProcess", content)
+
+        # Header button and shortcut
+        self.assertIn("optimizeDiskBtn", content)
+        self.assertIn("Qt.Key_O", content)
+        self.assertIn("hintOptimizePill", content)
+
+        # Optimizer modal dialog
+        self.assertIn("optimizeModalCard", content)
+        self.assertIn("Smart Btrfs Disk Optimizer", content)
+        self.assertIn("Safe Retention Guard Active", content)
+
     def test_keyboard_navigation_support(self):
         hud_path = os.path.join(PROJECT_ROOT, "SnapshotsHUD.qml")
         with open(hud_path, "r", encoding="utf-8") as f:
