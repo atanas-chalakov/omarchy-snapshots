@@ -1,0 +1,16 @@
+[Desktop Entry]
+Name=Snapshots & Recovery
+GenericName=Btrfs & Snapper System Restore HUD
+Comment=Instant Btrfs snapshot management, visual diffs, and bootloader rollback HUD for Omarchy
+Exec=/home/ac/.local/bin/omarchy-snapshots gui
+Icon=preferences-system-backup
+Terminal=false
+Type=Application
+Categories=System;
+Keywords=snaps;snapshot;snapshots;snapper;btrfs;backup;restore;rollback;recovery;limine;grub;boot;omarchy;
+StartupNotify=true
+Actions=Mock;
+
+[Desktop Action Mock]
+Name=Open Demo Preview
+Exec=/home/ac/.local/bin/omarchy-snapshots gui --mock

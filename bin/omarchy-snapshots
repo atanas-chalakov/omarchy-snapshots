@@ -61,7 +61,7 @@ def print_table(data):
 
 def main():
     parser = argparse.ArgumentParser(description="Omarchy Snapshots CLI")
-    parser.add_argument("command", nargs="?", default="list", choices=["list", "create", "delete", "pin", "unpin", "diff", "authorize", "json"], help="Command to run")
+    parser.add_argument("command", nargs="?", default="list", choices=["list", "create", "delete", "pin", "unpin", "diff", "authorize", "json", "gui", "toggle", "open", "show"], help="Command to run")
     parser.add_argument("--desc", default="", help="Description for new snapshot")
     parser.add_argument("--id", type=int, help="Snapshot ID")
     parser.add_argument("--important", action="store_true", help="Pin snapshot against auto-cleanup")
@@ -69,7 +69,13 @@ def main():
 
     args = parser.parse_args()
 
-    if args.command in ["list", "status"]:
+    if args.command in ["gui", "toggle", "open", "show"]:
+        cmd = ["omarchy-shell", "shell", "toggle", "ac.snapshots"]
+        if args.mock:
+            cmd = ["omarchy-shell", "shell", "summon", "ac.snapshots", '{"mock":true}']
+        res = subprocess.run(cmd)
+        sys.exit(res.returncode)
+    elif args.command in ["list", "status"]:
         core_args = ["status"]
         if args.mock:
             core_args.append("--mock")
