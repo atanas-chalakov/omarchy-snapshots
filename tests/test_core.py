@@ -102,6 +102,21 @@ class TestSnapshotsCore(unittest.TestCase):
         del_res = self.run_core(["delete", "--id", "17", "--mock"])
         self.assertTrue(del_res.get("ok"))
 
+    def test_mock_packages(self):
+        pkg_res = self.run_core(["packages", "--id", "19", "--mock"])
+        self.assertTrue(pkg_res.get("ok"))
+        self.assertEqual(pkg_res.get("snapshotId"), 19)
+        self.assertEqual(pkg_res.get("packageCount"), 6)
+        self.assertTrue(pkg_res.get("hasCriticalPackages"))
+        self.assertIn("linux", pkg_res.get("criticalPackages", []))
+        self.assertEqual(len(pkg_res.get("packages", [])), 6)
+
+    def test_mock_packages_missing_id(self):
+        cmd = [CORE_BIN, "packages", "--mock"]
+        res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        self.assertNotEqual(res.returncode, 0)
+        self.assertIn("--id is required", (res.stdout + res.stderr))
+
     def test_user_cli_list(self):
         res = subprocess.run([CLI_BIN, "list", "--mock"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
         self.assertEqual(res.returncode, 0)

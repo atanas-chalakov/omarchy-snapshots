@@ -7,6 +7,7 @@ diff analysis, and execution runners with graceful fallback and mock modes.
 
 import sys
 import os
+import re
 import json
 import subprocess
 import shutil
@@ -76,6 +77,120 @@ def get_disk_usage(path):
     except Exception:
         return 0, 0, 0
 
+def classify_package(pkg_name):
+    """Classify package to determine criticality and subsystem category."""
+    name = (pkg_name or "").lower()
+    if name in ["linux", "linux-zen", "linux-lts", "linux-hardened", "linux-firmware", "mkinitcpio", "systemd", "systemd-libs", "btrfs-progs", "limine", "dracut"]:
+        return True, "Kernel & Boot"
+    if any(name.startswith(p) for p in ["nvidia", "mesa", "vulkan", "amdgpu", "intel-media"]):
+        return True, "Graphics Driver"
+    if name in ["hyprland", "hyprland-git", "wayland", "xorg-server", "xwayland"]:
+        return True, "Display / Compositor"
+    if any(name.startswith(p) for p in ["omarchy", "quickshell", "waybar", "pipewire", "wireplumber"]):
+        return True, "Desktop Shell"
+    return False, None
+
+def parse_pacman_log(log_path="/var/log/pacman.log"):
+    """Parse /var/log/pacman.log for package installation, upgrade, and removal events."""
+    if not os.path.isfile(log_path):
+        return []
+    pattern = re.compile(r"^\[([0-9T:+-]+)\] \[ALPM\] (upgraded|installed|reinstalled|removed) ([^ ]+) \(([^)]+)\)")
+    entries = []
+    try:
+        with open(log_path, "r", encoding="utf-8", errors="replace") as f:
+            for line in f:
+                line = line.strip()
+                if "[ALPM]" not in line:
+                    continue
+                m = pattern.match(line)
+                if not m:
+                    continue
+                ts, action, pkg, ver = m.groups()
+                try:
+                    ep = int(datetime.strptime(ts, "%Y-%m-%dT%H:%M:%S%z").timestamp())
+                except Exception:
+                    continue
+
+                old_ver = ""
+                new_ver = ver
+                if " -> " in ver:
+                    parts = ver.split(" -> ")
+                    old_ver = parts[0].strip()
+                    new_ver = parts[1].strip()
+
+                is_crit, cat = classify_package(pkg)
+                entries.append({
+                    "epoch": ep,
+                    "action": action,
+                    "name": pkg,
+                    "version": ver,
+                    "oldVersion": old_ver,
+                    "newVersion": new_ver,
+                    "isCritical": is_crit,
+                    "criticalCategory": cat
+                })
+    except Exception:
+        pass
+    return entries
+
+def correlate_packages_for_snapshots(snapshots, log_entries=None):
+    """
+    Correlate ALPM log entries with snapshot transaction windows.
+    Takes snapshots list and attaches package details to each snapshot.
+    """
+    if log_entries is None:
+        log_entries = parse_pacman_log()
+
+    if not snapshots or not log_entries:
+        for s in snapshots:
+            s.setdefault("packageCount", 0)
+            s.setdefault("hasCriticalPackages", False)
+            s.setdefault("criticalPackages", [])
+            s.setdefault("packages", [])
+            s.setdefault("packageSummary", "No package changes")
+        return snapshots
+
+    # Sort snapshots ascending by epoch to compute intervals
+    sorted_snaps = sorted(snapshots, key=lambda x: x.get("epoch", 0))
+    for i, s in enumerate(sorted_snaps):
+        s_epoch = s.get("epoch", 0)
+        if not s_epoch:
+            s["packageCount"] = 0
+            s["hasCriticalPackages"] = False
+            s["criticalPackages"] = []
+            s["packages"] = []
+            s["packageSummary"] = "No package changes"
+            continue
+
+        start_time = s_epoch - 30
+        end_time = (sorted_snaps[i+1]["epoch"] - 1) if (i + 1 < len(sorted_snaps)) else (s_epoch + 1800)
+
+        matched = [e for e in log_entries if start_time <= e["epoch"] <= end_time]
+        has_crit = any(e["isCritical"] for e in matched)
+        crit_names = [e["name"] for e in matched if e["isCritical"]]
+
+        upgraded_count = sum(1 for e in matched if e["action"] == "upgraded")
+        installed_count = sum(1 for e in matched if e["action"] in ["installed", "reinstalled"])
+        removed_count = sum(1 for e in matched if e["action"] == "removed")
+
+        summary_parts = []
+        if upgraded_count:
+            summary_parts.append(f"{upgraded_count} upgraded")
+        if installed_count:
+            summary_parts.append(f"{installed_count} installed")
+        if removed_count:
+            summary_parts.append(f"{removed_count} removed")
+
+        summary_text = ", ".join(summary_parts) if summary_parts else ("No package changes" if not matched else f"{len(matched)} packages")
+
+        s["packageCount"] = len(matched)
+        s["hasCriticalPackages"] = has_crit
+        s["criticalPackages"] = crit_names
+        s["packages"] = matched
+        s["packageSummary"] = summary_text
+
+    return snapshots
+
 def get_mock_status():
     now = int(time.time())
     return {
@@ -117,7 +232,19 @@ def get_mock_status():
                         "cleanup": "number",
                         "important": False,
                         "bootable": True,
-                        "userdata": {"description": "Pre-Update (omarchy 4.0.2)"}
+                        "userdata": {"description": "Pre-Update (omarchy 4.0.2)"},
+                        "packageCount": 6,
+                        "hasCriticalPackages": True,
+                        "criticalPackages": ["linux", "hyprland", "mesa", "omarchy"],
+                        "packageSummary": "5 upgraded, 1 installed",
+                        "packages": [
+                            {"name": "linux", "action": "upgraded", "version": "6.11.2-arch1-1 -> 6.11.3-arch1-1", "oldVersion": "6.11.2-arch1-1", "newVersion": "6.11.3-arch1-1", "isCritical": True, "criticalCategory": "Kernel & Boot"},
+                            {"name": "hyprland", "action": "upgraded", "version": "0.44.1-1 -> 0.45.0-1", "oldVersion": "0.44.1-1", "newVersion": "0.45.0-1", "isCritical": True, "criticalCategory": "Display / Compositor"},
+                            {"name": "omarchy", "action": "upgraded", "version": "4.0.1-1 -> 4.0.2-1", "oldVersion": "4.0.1-1", "newVersion": "4.0.2-1", "isCritical": True, "criticalCategory": "Desktop Shell"},
+                            {"name": "mesa", "action": "upgraded", "version": "24.2.3-1 -> 24.2.4-1", "oldVersion": "24.2.3-1", "newVersion": "24.2.4-1", "isCritical": True, "criticalCategory": "Graphics Driver"},
+                            {"name": "brave-bin", "action": "upgraded", "version": "1.96.59-1 -> 1.96.61-1", "oldVersion": "1.96.59-1", "newVersion": "1.96.61-1", "isCritical": False, "criticalCategory": None},
+                            {"name": "waybar", "action": "installed", "version": "0.11.0-1", "oldVersion": "", "newVersion": "0.11.0-1", "isCritical": True, "criticalCategory": "Desktop Shell"}
+                        ]
                     },
                     {
                         "id": 18,
@@ -129,7 +256,15 @@ def get_mock_status():
                         "cleanup": "none",
                         "important": True,
                         "bootable": True,
-                        "userdata": {"important": "yes"}
+                        "userdata": {"important": "yes"},
+                        "packageCount": 2,
+                        "hasCriticalPackages": True,
+                        "criticalPackages": ["nvidia-dkms", "nvidia-utils"],
+                        "packageSummary": "2 upgraded",
+                        "packages": [
+                            {"name": "nvidia-dkms", "action": "upgraded", "version": "555.58.02-1 -> 560.35.03-1", "oldVersion": "555.58.02-1", "newVersion": "560.35.03-1", "isCritical": True, "criticalCategory": "Graphics Driver"},
+                            {"name": "nvidia-utils", "action": "upgraded", "version": "555.58.02-1 -> 560.35.03-1", "oldVersion": "555.58.02-1", "newVersion": "560.35.03-1", "isCritical": True, "criticalCategory": "Graphics Driver"}
+                        ]
                     },
                     {
                         "id": 17,
@@ -141,7 +276,15 @@ def get_mock_status():
                         "cleanup": "number",
                         "important": False,
                         "bootable": True,
-                        "userdata": {}
+                        "userdata": {},
+                        "packageCount": 2,
+                        "hasCriticalPackages": False,
+                        "criticalPackages": [],
+                        "packageSummary": "2 upgraded",
+                        "packages": [
+                            {"name": "aether", "action": "upgraded", "version": "4.29.8-1 -> 4.30.0-1", "oldVersion": "4.29.8-1", "newVersion": "4.30.0-1", "isCritical": False, "criticalCategory": None},
+                            {"name": "mise-bin", "action": "upgraded", "version": "2026.9.5-1 -> 2026.9.14-1", "oldVersion": "2026.9.5-1", "newVersion": "2026.9.14-1", "isCritical": False, "criticalCategory": None}
+                        ]
                     },
                     {
                         "id": 16,
@@ -153,7 +296,12 @@ def get_mock_status():
                         "cleanup": "none",
                         "important": True,
                         "bootable": True,
-                        "userdata": {"important": "yes"}
+                        "userdata": {"important": "yes"},
+                        "packageCount": 0,
+                        "hasCriticalPackages": False,
+                        "criticalPackages": [],
+                        "packageSummary": "No package changes",
+                        "packages": []
                     }
                 ]
             }
@@ -285,6 +433,9 @@ def get_live_status():
                         "bootable": True, # On Omarchy, all root snapshots sync to Limine
                         "userdata": userdata
                     })
+
+                # Correlate pacman packages for snapshots
+                snapshots = correlate_packages_for_snapshots(snapshots)
 
                 # Sort newest snapshot first
                 snapshots.sort(key=lambda x: x["id"], reverse=True)
@@ -473,6 +624,18 @@ def get_diff(snap_id, config="root", mock=False):
                 {"path": "/usr/lib/modules/6.11.2-arch1-1", "status": "added"},
                 {"path": "/usr/lib/modules/6.11.1-arch1-1", "status": "deleted"},
                 {"path": "/etc/hypr/hyprland.conf", "status": "modified"}
+            ],
+            "packageCount": 6,
+            "hasCriticalPackages": True,
+            "criticalPackages": ["linux", "hyprland", "mesa", "omarchy"],
+            "packageSummary": "5 upgraded, 1 installed",
+            "packages": [
+                {"name": "linux", "action": "upgraded", "version": "6.11.2-arch1-1 -> 6.11.3-arch1-1", "oldVersion": "6.11.2-arch1-1", "newVersion": "6.11.3-arch1-1", "isCritical": True, "criticalCategory": "Kernel & Boot"},
+                {"name": "hyprland", "action": "upgraded", "version": "0.44.1-1 -> 0.45.0-1", "oldVersion": "0.44.1-1", "newVersion": "0.45.0-1", "isCritical": True, "criticalCategory": "Display / Compositor"},
+                {"name": "omarchy", "action": "upgraded", "version": "4.0.1-1 -> 4.0.2-1", "oldVersion": "4.0.1-1", "newVersion": "4.0.2-1", "isCritical": True, "criticalCategory": "Desktop Shell"},
+                {"name": "mesa", "action": "upgraded", "version": "24.2.3-1 -> 24.2.4-1", "oldVersion": "24.2.3-1", "newVersion": "24.2.4-1", "isCritical": True, "criticalCategory": "Graphics Driver"},
+                {"name": "brave-bin", "action": "upgraded", "version": "1.96.59-1 -> 1.96.61-1", "oldVersion": "1.96.59-1", "newVersion": "1.96.61-1", "isCritical": False, "criticalCategory": None},
+                {"name": "waybar", "action": "installed", "version": "0.11.0-1", "oldVersion": "", "newVersion": "0.11.0-1", "isCritical": True, "criticalCategory": "Desktop Shell"}
             ]
         }
 
@@ -509,11 +672,32 @@ def get_diff(snap_id, config="root", mock=False):
 
         files.append({"path": filepath, "status": status})
 
+    # Attach correlated packages from snapshot status
+    st = get_live_status()
+    matched_pkgs = []
+    pkg_summary = "No package changes"
+    has_crit = False
+    crit_pkgs = []
+    for cfg in st.get("configs", []):
+        if cfg.get("name") == config or not config:
+            for s in cfg.get("snapshots", []):
+                if s.get("id") == snap_id:
+                    matched_pkgs = s.get("packages", [])
+                    pkg_summary = s.get("packageSummary", "No package changes")
+                    has_crit = s.get("hasCriticalPackages", False)
+                    crit_pkgs = s.get("criticalPackages", [])
+                    break
+
     return {
         "ok": True,
         "snapshotId": snap_id,
         "summary": {"added": added, "modified": modified, "deleted": deleted},
-        "files": files[:200] # limit to top 200 changes for fast rendering
+        "files": files[:200], # limit to top 200 changes for fast rendering
+        "packageCount": len(matched_pkgs),
+        "hasCriticalPackages": has_crit,
+        "criticalPackages": crit_pkgs,
+        "packageSummary": pkg_summary,
+        "packages": matched_pkgs
     }
 
 def authorize_access(config="root"):
@@ -532,7 +716,7 @@ def authorize_access(config="root"):
 
 def main():
     parser = argparse.ArgumentParser(description="Omarchy Snapshots Backend Core")
-    parser.add_argument("command", choices=["status", "create", "delete", "pin", "unpin", "diff", "authorize", "restore"], help="Action to execute")
+    parser.add_argument("command", choices=["status", "create", "delete", "pin", "unpin", "diff", "authorize", "restore", "packages"], help="Action to execute")
     parser.add_argument("--mock", action="store_true", help="Output mock data for testing or preview")
     parser.add_argument("--config", default="root", help="Snapper config name (default: root)")
     parser.add_argument("--desc", default="", help="Description for snapshot creation")
@@ -577,6 +761,31 @@ def main():
         res = get_diff(args.id, config=args.config, mock=args.mock)
         print(json.dumps(res, indent=2))
         sys.exit(0 if res.get("ok") else 1)
+    elif args.command == "packages":
+        if args.id is None:
+            print(json.dumps({"ok": False, "error": "--id is required for packages"}))
+            sys.exit(1)
+        st = get_mock_status() if args.mock else get_live_status()
+        found = None
+        for cfg in st.get("configs", []):
+            if cfg.get("name") == args.config or not args.config:
+                for s in cfg.get("snapshots", []):
+                    if s.get("id") == args.id:
+                        found = s
+                        break
+        if not found:
+            print(json.dumps({"ok": False, "error": f"Snapshot #{args.id} not found."}))
+            sys.exit(1)
+        print(json.dumps({
+            "ok": True,
+            "snapshotId": args.id,
+            "packageCount": found.get("packageCount", 0),
+            "hasCriticalPackages": found.get("hasCriticalPackages", False),
+            "criticalPackages": found.get("criticalPackages", []),
+            "packageSummary": found.get("packageSummary", ""),
+            "packages": found.get("packages", [])
+        }, indent=2))
+        sys.exit(0)
     elif args.command == "authorize":
         res = authorize_access(config=args.config)
         print(json.dumps(res, indent=2))

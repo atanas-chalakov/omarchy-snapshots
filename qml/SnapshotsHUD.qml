@@ -1347,6 +1347,34 @@ Item {
                         Text { text: "Bootable"; font.pixelSize: 9; color: "#10B981" }
                       }
                     }
+
+                    // Package Updates Chip
+                    Rectangle {
+                      visible: (modelData.packageCount && modelData.packageCount > 0) ? true : false
+                      implicitHeight: 18
+                      implicitWidth: pkgChipLayout.implicitWidth + 12
+                      radius: 9
+                      color: modelData.hasCriticalPackages ? Qt.rgba(0.96, 0.62, 0.04, 0.2) : Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.15)
+                      border.color: modelData.hasCriticalPackages ? "#F59E0B" : Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.3)
+                      border.width: 1
+
+                      RowLayout {
+                        id: pkgChipLayout
+                        anchors.centerIn: parent
+                        spacing: 4
+                        Text {
+                          text: modelData.hasCriticalPackages ? "󰒋" : "󰏔"
+                          font.pixelSize: 9
+                          color: modelData.hasCriticalPackages ? "#F59E0B" : Color.accent
+                        }
+                        Text {
+                          text: modelData.packageCount + " pkgs"
+                          font.pixelSize: 9
+                          font.weight: Font.Medium
+                          color: modelData.hasCriticalPackages ? "#F59E0B" : Color.accent
+                        }
+                      }
+                    }
                   }
 
                   RowLayout {
@@ -1360,6 +1388,12 @@ Item {
                       text: " " + (modelData.date || "")
                       font.pixelSize: 11
                       color: Color.muted
+                    }
+                    Text {
+                      visible: (modelData.packageCount && modelData.packageCount > 0) ? true : false
+                      text: "󰏖 " + (modelData.packageSummary || "")
+                      font.pixelSize: 11
+                      color: modelData.hasCriticalPackages ? "#F59E0B" : Color.muted
                     }
                   }
                 }
@@ -2186,17 +2220,23 @@ Item {
         Rectangle {
           id: diffModalCard
           anchors.centerIn: parent
-          width: 720
-          height: 520
+          width: 760
+          height: 540
           radius: 12
           color: Color.background
           border.color: Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.4)
           border.width: 1
           focus: root.showDiffModal
 
+          property string diffTab: "files" // "files" or "packages"
+
           Keys.onEscapePressed: {
             root.showDiffModal = false
             keyCatcher.forceActiveFocus()
+          }
+
+          Keys.onTabPressed: {
+            diffModalCard.diffTab = (diffModalCard.diffTab === "files") ? "packages" : "files"
           }
 
           MouseArea { anchors.fill: parent }
@@ -2204,7 +2244,7 @@ Item {
           ColumnLayout {
             anchors.fill: parent
             anchors.margins: 20
-            spacing: 14
+            spacing: 12
 
             RowLayout {
               Layout.fillWidth: true
@@ -2227,47 +2267,150 @@ Item {
               }
             }
 
+            // View Mode Tabs: Files vs Packages
+            RowLayout {
+              spacing: 8
+              Rectangle {
+                property bool active: diffModalCard.diffTab === "files"
+                implicitHeight: 28
+                implicitWidth: tabFilesRow.implicitWidth + 20
+                radius: 14
+                color: active ? Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.2) : Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.05)
+                border.color: active ? Color.accent : Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.1)
+                border.width: 1
+                MouseArea {
+                  anchors.fill: parent
+                  cursorShape: Qt.PointingHandCursor
+                  onClicked: diffModalCard.diffTab = "files"
+                }
+                RowLayout {
+                  id: tabFilesRow
+                  anchors.centerIn: parent
+                  spacing: 6
+                  Text { text: "📁"; font.pixelSize: 11 }
+                  Text {
+                    text: "File Changes (" + ((root.activeDiffData && root.activeDiffData.files) ? root.activeDiffData.files.length : 0) + ")"
+                    font.pixelSize: 11
+                    font.weight: parent.parent.active ? Font.Bold : Font.Normal
+                    color: parent.parent.active ? Color.accent : Color.muted
+                  }
+                }
+              }
+
+              Rectangle {
+                property bool active: diffModalCard.diffTab === "packages"
+                property int pkgCount: (root.activeDiffData && root.activeDiffData.packageCount) || 0
+                implicitHeight: 28
+                implicitWidth: tabPkgsRow.implicitWidth + 20
+                radius: 14
+                color: active ? Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.2) : Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.05)
+                border.color: active ? Color.accent : Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.1)
+                border.width: 1
+                MouseArea {
+                  anchors.fill: parent
+                  cursorShape: Qt.PointingHandCursor
+                  onClicked: diffModalCard.diffTab = "packages"
+                }
+                RowLayout {
+                  id: tabPkgsRow
+                  anchors.centerIn: parent
+                  spacing: 6
+                  Text {
+                    text: (root.activeDiffData && root.activeDiffData.hasCriticalPackages) ? "󰒋" : "📦"
+                    font.pixelSize: 11
+                    color: (root.activeDiffData && root.activeDiffData.hasCriticalPackages) ? "#F59E0B" : Color.accent
+                  }
+                  Text {
+                    text: "Package Updates (" + parent.parent.pkgCount + ")"
+                    font.pixelSize: 11
+                    font.weight: parent.parent.active ? Font.Bold : Font.Normal
+                    color: parent.parent.active ? Color.accent : Color.muted
+                  }
+                  Rectangle {
+                    visible: (root.activeDiffData && root.activeDiffData.hasCriticalPackages) === true
+                    implicitHeight: 15
+                    implicitWidth: critBadgeTxt.implicitWidth + 8
+                    radius: 7
+                    color: Qt.rgba(0.96, 0.62, 0.04, 0.25)
+                    Text {
+                      id: critBadgeTxt
+                      anchors.centerIn: parent
+                      text: "Critical"
+                      font.pixelSize: 8
+                      font.weight: Font.Bold
+                      color: "#F59E0B"
+                    }
+                  }
+                }
+              }
+
+              Item { Layout.fillWidth: true }
+
+              Text {
+                text: "Tab: switch view"
+                font.pixelSize: 10
+                color: Color.muted
+              }
+            }
+
             // Summary row
             RowLayout {
               spacing: 12
-              property var summary: (root.activeDiffData && root.activeDiffData.summary) || ({})
-              Rectangle {
-                implicitHeight: 24
-                implicitWidth: addSummaryText.implicitWidth + 16
-                radius: 12
-                color: Qt.rgba(0.06, 0.72, 0.51, 0.15)
-                Text {
-                  id: addSummaryText
-                  anchors.centerIn: parent
-                  text: "+" + (parent.parent.summary.added || 0) + " Added"
-                  font.pixelSize: 11
-                  color: "#10B981"
+
+              // File summary chips (visible when files tab active)
+              RowLayout {
+                visible: diffModalCard.diffTab === "files"
+                spacing: 8
+                property var summary: (root.activeDiffData && root.activeDiffData.summary) || ({})
+                Rectangle {
+                  implicitHeight: 22
+                  implicitWidth: addSummaryText.implicitWidth + 14
+                  radius: 11
+                  color: Qt.rgba(0.06, 0.72, 0.51, 0.15)
+                  Text {
+                    id: addSummaryText
+                    anchors.centerIn: parent
+                    text: "+" + (parent.parent.summary.added || 0) + " Added"
+                    font.pixelSize: 10
+                    color: "#10B981"
+                  }
+                }
+                Rectangle {
+                  implicitHeight: 22
+                  implicitWidth: modSummaryText.implicitWidth + 14
+                  radius: 11
+                  color: Qt.rgba(0.96, 0.62, 0.04, 0.15)
+                  Text {
+                    id: modSummaryText
+                    anchors.centerIn: parent
+                    text: "~" + (parent.parent.summary.modified || 0) + " Modified"
+                    font.pixelSize: 10
+                    color: "#F59E0B"
+                  }
+                }
+                Rectangle {
+                  implicitHeight: 22
+                  implicitWidth: delSummaryText.implicitWidth + 14
+                  radius: 11
+                  color: Qt.rgba(0.94, 0.27, 0.27, 0.15)
+                  Text {
+                    id: delSummaryText
+                    anchors.centerIn: parent
+                    text: "-" + (parent.parent.summary.deleted || 0) + " Deleted"
+                    font.pixelSize: 10
+                    color: "#EF4444"
+                  }
                 }
               }
-              Rectangle {
-                implicitHeight: 24
-                implicitWidth: modSummaryText.implicitWidth + 16
-                radius: 12
-                color: Qt.rgba(0.96, 0.62, 0.04, 0.15)
+
+              // Package summary text (visible when packages tab active)
+              RowLayout {
+                visible: diffModalCard.diffTab === "packages"
+                spacing: 8
                 Text {
-                  id: modSummaryText
-                  anchors.centerIn: parent
-                  text: "~" + (parent.parent.summary.modified || 0) + " Modified"
+                  text: (root.activeDiffData && root.activeDiffData.packageSummary) ? ("󰏖 " + root.activeDiffData.packageSummary) : "No packages logged"
                   font.pixelSize: 11
-                  color: "#F59E0B"
-                }
-              }
-              Rectangle {
-                implicitHeight: 24
-                implicitWidth: delSummaryText.implicitWidth + 16
-                radius: 12
-                color: Qt.rgba(0.94, 0.27, 0.27, 0.15)
-                Text {
-                  id: delSummaryText
-                  anchors.centerIn: parent
-                  text: "-" + (parent.parent.summary.deleted || 0) + " Deleted"
-                  font.pixelSize: 11
-                  color: "#EF4444"
+                  color: (root.activeDiffData && root.activeDiffData.hasCriticalPackages) ? "#F59E0B" : Color.muted
                 }
               }
             }
@@ -2296,7 +2439,7 @@ Item {
 
                 Text {
                   anchors.fill: parent
-                  text: "Filter changed files (e.g. /etc or .conf)..."
+                  text: diffModalCard.diffTab === "files" ? "Filter changed files (e.g. /etc or .conf)..." : "Filter packages (e.g. linux, hyprland, mesa)..."
                   font.pixelSize: 11
                   color: Color.muted
                   visible: !parent.text
@@ -2304,8 +2447,9 @@ Item {
               }
             }
 
-            // Diff files list
+            // Content View 1: Diff files list
             ScrollView {
+              visible: diffModalCard.diffTab === "files"
               Layout.fillWidth: true
               Layout.fillHeight: true
               clip: true
@@ -2357,6 +2501,125 @@ Item {
                       color: Color.foreground
                       Layout.fillWidth: true
                       elide: Text.ElideMiddle
+                    }
+                  }
+                }
+              }
+            }
+
+            // Content View 2: Package updates list
+            ScrollView {
+              visible: diffModalCard.diffTab === "packages"
+              Layout.fillWidth: true
+              Layout.fillHeight: true
+              clip: true
+
+              ListView {
+                width: parent.width
+                spacing: 6
+                model: {
+                  var raw = (root.activeDiffData && root.activeDiffData.packages) || []
+                  if (!root.diffFilterQuery) return raw
+                  var filtered = []
+                  for (var i = 0; i < raw.length; i++) {
+                    var n = (raw[i].name || "").toLowerCase()
+                    var v = (raw[i].version || "").toLowerCase()
+                    var c = (raw[i].criticalCategory || "").toLowerCase()
+                    if (n.indexOf(root.diffFilterQuery) !== -1 || v.indexOf(root.diffFilterQuery) !== -1 || c.indexOf(root.diffFilterQuery) !== -1) {
+                      filtered.push(raw[i])
+                    }
+                  }
+                  return filtered
+                }
+
+                // Empty packages state
+                Item {
+                  visible: parent.count === 0
+                  anchors.centerIn: parent
+                  width: parent.width
+                  height: 120
+                  ColumnLayout {
+                    anchors.centerIn: parent
+                    spacing: 6
+                    Text { Layout.alignment: Qt.AlignHCenter; text: "📦"; font.pixelSize: 28 }
+                    Text {
+                      Layout.alignment: Qt.AlignHCenter
+                      text: (root.activeDiffData && root.activeDiffData.packageCount > 0) ? "No packages match filter." : "No package changes recorded for this snapshot."
+                      font.pixelSize: 12
+                      color: Color.muted
+                    }
+                  }
+                }
+
+                delegate: Rectangle {
+                  width: parent.width
+                  implicitHeight: 34
+                  radius: 6
+                  color: modelData.isCritical ? Qt.rgba(0.96, 0.62, 0.04, 0.08) : Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.03)
+                  border.color: modelData.isCritical ? Qt.rgba(0.96, 0.62, 0.04, 0.3) : Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.06)
+                  border.width: 1
+
+                  RowLayout {
+                    anchors.fill: parent
+                    anchors.leftMargin: 10
+                    anchors.rightMargin: 10
+                    spacing: 10
+
+                    // Action pill
+                    Rectangle {
+                      implicitHeight: 20
+                      implicitWidth: actTxt.implicitWidth + 10
+                      radius: 4
+                      color: modelData.action === "installed" ? Qt.rgba(0.06, 0.72, 0.51, 0.2) : (modelData.action === "removed" ? Qt.rgba(0.94, 0.27, 0.27, 0.2) : (modelData.action === "reinstalled" ? Qt.rgba(0.96, 0.62, 0.04, 0.2) : Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.2)))
+                      Text {
+                        id: actTxt
+                        anchors.centerIn: parent
+                        text: modelData.action
+                        font.pixelSize: 9
+                        font.weight: Font.Bold
+                        color: modelData.action === "installed" ? "#10B981" : (modelData.action === "removed" ? "#EF4444" : (modelData.action === "reinstalled" ? "#F59E0B" : Color.accent))
+                      }
+                    }
+
+                    // Package name
+                    Text {
+                      text: modelData.name
+                      font.pixelSize: 12
+                      font.weight: Font.DemiBold
+                      color: Color.foreground
+                    }
+
+                    // Critical Category Tag
+                    Rectangle {
+                      visible: modelData.isCritical === true
+                      implicitHeight: 18
+                      implicitWidth: catTxt.implicitWidth + 10
+                      radius: 4
+                      color: Qt.rgba(0.96, 0.62, 0.04, 0.2)
+                      border.color: "#F59E0B"
+                      border.width: 1
+                      RowLayout {
+                        anchors.centerIn: parent
+                        spacing: 3
+                        Text { text: "⚠"; font.pixelSize: 8 }
+                        Text {
+                          id: catTxt
+                          text: modelData.criticalCategory || "Critical"
+                          font.pixelSize: 9
+                          font.weight: Font.Bold
+                          color: "#F59E0B"
+                        }
+                      }
+                    }
+
+                    Item { Layout.fillWidth: true }
+
+                    // Version transition
+                    Text {
+                      text: modelData.version || ""
+                      font.pixelSize: 11
+                      font.family: Style.font.monospace
+                      color: Color.muted
                     }
                   }
                 }

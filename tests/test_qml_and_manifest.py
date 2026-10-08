@@ -112,6 +112,23 @@ class TestQmlAndManifest(unittest.TestCase):
         self.assertIn("showRestoreModal", content)
         self.assertIn("showDeleteModal", content)
 
+    def test_package_correlator_ui(self):
+        hud_path = os.path.join(PROJECT_ROOT, "SnapshotsHUD.qml")
+        with open(hud_path, "r", encoding="utf-8") as f:
+            content = f.read()
+
+        # Diff modal tabs
+        self.assertIn("property string diffTab", content)
+        self.assertIn("tabPkgsRow", content)
+        self.assertIn("Package Updates", content)
+        self.assertIn("File Changes", content)
+
+        # Snapshot card package badges
+        self.assertIn("pkgChipLayout", content)
+        self.assertIn("hasCriticalPackages", content)
+        self.assertIn("packageSummary", content)
+        self.assertIn("criticalCategory", content)
+
     def test_keyboard_navigation_support(self):
         hud_path = os.path.join(PROJECT_ROOT, "SnapshotsHUD.qml")
         with open(hud_path, "r", encoding="utf-8") as f:

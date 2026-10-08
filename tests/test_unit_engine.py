@@ -140,6 +140,102 @@ class TestUnitEngine(unittest.TestCase):
             self.assertIn("path", f)
             self.assertIn(f["status"], ["added", "modified", "deleted"])
 
+    def test_classify_package(self):
+        # Kernel & Boot
+        self.assertEqual(core.classify_package("linux"), (True, "Kernel & Boot"))
+        self.assertEqual(core.classify_package("linux-zen"), (True, "Kernel & Boot"))
+        self.assertEqual(core.classify_package("limine"), (True, "Kernel & Boot"))
+        self.assertEqual(core.classify_package("systemd"), (True, "Kernel & Boot"))
+
+        # Graphics Driver
+        self.assertEqual(core.classify_package("nvidia-utils"), (True, "Graphics Driver"))
+        self.assertEqual(core.classify_package("mesa"), (True, "Graphics Driver"))
+        self.assertEqual(core.classify_package("vulkan-radeon"), (True, "Graphics Driver"))
+
+        # Display / Compositor
+        self.assertEqual(core.classify_package("hyprland"), (True, "Display / Compositor"))
+        self.assertEqual(core.classify_package("wayland"), (True, "Display / Compositor"))
+
+        # Desktop Shell
+        self.assertEqual(core.classify_package("omarchy"), (True, "Desktop Shell"))
+        self.assertEqual(core.classify_package("quickshell"), (True, "Desktop Shell"))
+        self.assertEqual(core.classify_package("waybar"), (True, "Desktop Shell"))
+
+        # Non-critical packages
+        self.assertEqual(core.classify_package("htop"), (False, None))
+        self.assertEqual(core.classify_package("ripgrep"), (False, None))
+        self.assertEqual(core.classify_package(""), (False, None))
+
+    def test_parse_pacman_log_entries(self):
+        import tempfile
+        sample_log = (
+            "[2026-10-07T16:30:10+0300] [PACMAN] Running 'pacman -Syu'\n"
+            "[2026-10-07T16:30:15+0300] [ALPM] upgraded linux (6.11.2-arch1-1 -> 6.11.3-arch1-1)\n"
+            "[2026-10-07T16:30:18+0300] [ALPM] installed waybar (0.11.0-1)\n"
+            "[2026-10-07T16:30:20+0300] [ALPM] removed htop (3.3.0-1)\n"
+            "[2026-10-07T16:30:22+0300] [ALPM] reinstalled mesa (24.2.3-1)\n"
+        )
+        with tempfile.NamedTemporaryFile("w+", encoding="utf-8", delete=False) as tf:
+            tf.write(sample_log)
+            tf_path = tf.name
+
+        try:
+            entries = core.parse_pacman_log(tf_path)
+            self.assertEqual(len(entries), 4)
+
+            # Check upgraded linux
+            e0 = entries[0]
+            self.assertEqual(e0["name"], "linux")
+            self.assertEqual(e0["action"], "upgraded")
+            self.assertEqual(e0["oldVersion"], "6.11.2-arch1-1")
+            self.assertEqual(e0["newVersion"], "6.11.3-arch1-1")
+            self.assertTrue(e0["isCritical"])
+            self.assertEqual(e0["criticalCategory"], "Kernel & Boot")
+
+            # Check installed waybar
+            e1 = entries[1]
+            self.assertEqual(e1["name"], "waybar")
+            self.assertEqual(e1["action"], "installed")
+            self.assertEqual(e1["newVersion"], "0.11.0-1")
+            self.assertTrue(e1["isCritical"])
+            self.assertEqual(e1["criticalCategory"], "Desktop Shell")
+
+            # Check removed htop
+            e2 = entries[2]
+            self.assertEqual(e2["name"], "htop")
+            self.assertEqual(e2["action"], "removed")
+            self.assertFalse(e2["isCritical"])
+            self.assertIsNone(e2["criticalCategory"])
+        finally:
+            if os.path.exists(tf_path):
+                os.remove(tf_path)
+
+    def test_correlate_packages_for_snapshots(self):
+        t0 = 1760000000
+        mock_snaps = [
+            {"id": 1, "epoch": t0, "description": "Snap 1"},
+            {"id": 2, "epoch": t0 + 3600, "description": "Snap 2"}
+        ]
+        mock_log = [
+            {"epoch": t0 + 10, "name": "linux", "action": "upgraded", "version": "1 -> 2", "isCritical": True, "criticalCategory": "Kernel & Boot"},
+            {"epoch": t0 + 20, "name": "htop", "action": "installed", "version": "1.0", "isCritical": False, "criticalCategory": None},
+            {"epoch": t0 + 3605, "name": "hyprland", "action": "upgraded", "version": "0.44 -> 0.45", "isCritical": True, "criticalCategory": "Display / Compositor"}
+        ]
+        res = core.correlate_packages_for_snapshots(mock_snaps, mock_log)
+        self.assertEqual(len(res), 2)
+
+        s1 = res[0]
+        self.assertEqual(s1["packageCount"], 2)
+        self.assertTrue(s1["hasCriticalPackages"])
+        self.assertIn("linux", s1["criticalPackages"])
+        self.assertIn("1 upgraded, 1 installed", s1["packageSummary"])
+
+        s2 = res[1]
+        self.assertEqual(s2["packageCount"], 1)
+        self.assertTrue(s2["hasCriticalPackages"])
+        self.assertIn("hyprland", s2["criticalPackages"])
+        self.assertIn("1 upgraded", s2["packageSummary"])
+
     def test_live_status_safe_read(self):
         # Querying live status on current system should not crash and should parse snapshots cleanly
         st = core.get_live_status()

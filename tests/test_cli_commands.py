@@ -95,9 +95,23 @@ class TestCliCommands(unittest.TestCase):
         self.assertEqual(res.returncode, 0)
         self.assertIn("deleted", res.stdout.lower())
 
+    def test_cli_packages_mock(self):
+        res = self.run_cmd(CLI_BIN, ["packages", "--id", "19", "--mock"])
+        self.assertEqual(res.returncode, 0)
+        self.assertIn("Package Updates for Snapshot #19", res.stdout)
+        self.assertIn("linux", res.stdout)
+        self.assertIn("hyprland", res.stdout)
+        self.assertIn("Kernel & Boot", res.stdout)
+        self.assertIn("Desktop Shell", res.stdout)
+
     # Error handling test cases
     def test_missing_id_diff(self):
         res = self.run_cmd(CLI_BIN, ["diff", "--mock"])
+        self.assertNotEqual(res.returncode, 0)
+        self.assertIn("--id is required", (res.stdout + res.stderr))
+
+    def test_missing_id_packages(self):
+        res = self.run_cmd(CLI_BIN, ["packages", "--mock"])
         self.assertNotEqual(res.returncode, 0)
         self.assertIn("--id is required", (res.stdout + res.stderr))
 
