@@ -163,8 +163,29 @@ class TestQmlAndManifest(unittest.TestCase):
         self.assertIn("onTextKey", content)
         self.assertIn("keyCatcher.forceActiveFocus()", content)
 
-        # Footer hint bar
+        # Window focus automation
+        self.assertIn("windowFocusProcess", content)
+        self.assertIn("hl.dsp.focus", content)
+
+        # Visual shortcut key badges next to buttons & inputs
+        self.assertIn("keyRefTxt", content)
+        self.assertIn("keyNewTxt", content)
+        self.assertIn("keyEscTxt", content)
+        self.assertIn("chipKeyText", content)
+        self.assertIn("searchKeyBadge", content)
+        self.assertIn("diffKeyTxt", content)
+        self.assertIn("browseKeyTxt", content)
+        self.assertIn("pinKeyTxt", content)
+        self.assertIn("resKeyTxt", content)
+        self.assertIn("delKeyTxt", content)
+
+        # Interactive footer hint bar pills
         self.assertIn("Keyboard Shortcuts Footer Hint Bar", content)
+        self.assertIn("h1Mouse", content)
+        self.assertIn("h2Mouse", content)
+        self.assertIn("h3Mouse", content)
+        self.assertIn("h6Mouse", content)
+        self.assertIn("h10Mouse", content)
 
     def test_preview_image_valid(self):
         preview_path = os.path.join(PROJECT_ROOT, "preview.png")

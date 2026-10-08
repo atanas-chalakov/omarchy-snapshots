@@ -87,6 +87,7 @@ def main():
         else:
             cmd = ["omarchy-shell", "shell", "toggle", "ac.snapshots"]
         res = subprocess.run(cmd)
+        subprocess.run(["hyprctl", "dispatch", "hl.dsp.focus({ window = \"title:Snapshots & Recovery\" })"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         sys.exit(res.returncode)
     elif args.command in ["list", "status"]:
         core_args = ["status"]

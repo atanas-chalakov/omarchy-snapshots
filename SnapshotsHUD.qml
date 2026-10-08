@@ -239,6 +239,8 @@ Item {
   function open(payloadJson) {
     closingFromHost = false
     window.visible = true
+    if (windowFocusProcess.running) windowFocusProcess.running = false
+    windowFocusProcess.running = true
     if (payloadJson) {
       try {
         var parsed = JSON.parse(String(payloadJson))
@@ -260,6 +262,8 @@ Item {
     }
     refresh()
     Qt.callLater(function() {
+      if (windowFocusProcess.running) windowFocusProcess.running = false
+      windowFocusProcess.running = true
       if (keyCatcher) keyCatcher.forceActiveFocus()
     })
   }
@@ -382,6 +386,11 @@ Item {
     }
   }
 
+  Process {
+    id: windowFocusProcess
+    command: ["hyprctl", "dispatch", "hl.dsp.focus({ window = \"title:Snapshots & Recovery\" })"]
+  }
+
   Component.onCompleted: {
     refresh()
     Qt.callLater(function() {
@@ -402,9 +411,15 @@ Item {
 
     onVisibleChanged: {
       if (visible) {
+        if (windowFocusProcess.running) windowFocusProcess.running = false
+        windowFocusProcess.running = true
         Qt.callLater(function() {
           if (keyCatcher) keyCatcher.forceActiveFocus()
         })
+      } else {
+        if (!root.closingFromHost && root.shell && typeof root.shell.hide === "function") {
+          root.shell.hide((root.manifest && root.manifest.id) || "ac.snapshots")
+        }
       }
     }
 
@@ -469,12 +484,33 @@ Item {
             if (root.showDeleteModal) root.executeDelete()
             else if (root.selectedSnapshot) root.confirmDelete(root.selectedSnapshot)
             event.accepted = true
-          } else if (event.key === Qt.Key_F) {
+          } else if (event.key === Qt.Key_F || event.key === Qt.Key_Slash) {
             searchInput.forceActiveFocus()
             searchInput.selectAll()
             event.accepted = true
           } else if (event.key === Qt.Key_G) {
             root.refresh()
+            event.accepted = true
+          } else if (event.key === Qt.Key_1) {
+            root.currentFilter = "all"
+            event.accepted = true
+          } else if (event.key === Qt.Key_2) {
+            root.currentFilter = "update"
+            event.accepted = true
+          } else if (event.key === Qt.Key_3) {
+            root.currentFilter = "manual"
+            event.accepted = true
+          } else if (event.key === Qt.Key_4) {
+            root.currentFilter = "pinned"
+            event.accepted = true
+          } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+            if (root.showRestoreModal) {
+              root.executeRestore()
+            } else if (root.showDeleteModal) {
+              root.executeDelete()
+            } else if (root.selectedSnapshot) {
+              root.inspectDiff(root.selectedSnapshot.id)
+            }
             event.accepted = true
           } else if (event.key === Qt.Key_Escape || event.key === Qt.Key_Q) {
             if (root.showDiffModal) {
@@ -720,7 +756,7 @@ Item {
             // Refresh Button
             Rectangle {
               implicitHeight: 34
-              implicitWidth: 34
+              implicitWidth: refreshBtnLayout.implicitWidth + 18
               radius: 8
               color: refreshMouse.containsMouse ? Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.10) : Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.04)
               border.color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.12)
@@ -731,16 +767,37 @@ Item {
                 anchors.fill: parent
                 hoverEnabled: true
                 cursorShape: Qt.PointingHandCursor
-                onClicked: root.refresh()
+                onClicked: {
+                  root.refresh()
+                  keyCatcher.forceActiveFocus()
+                }
               }
 
-              Text {
+              RowLayout {
+                id: refreshBtnLayout
                 anchors.centerIn: parent
-                text: "󰑐"
-                font.pixelSize: 14
-                color: root.isRefreshing ? Color.accent : Color.foreground
-                rotation: root.isRefreshing ? 180 : 0
-                Behavior on rotation { NumberAnimation { duration: 400 } }
+                spacing: 6
+                Text {
+                  text: "󰑐"
+                  font.pixelSize: 13
+                  color: root.isRefreshing ? Color.accent : Color.foreground
+                  rotation: root.isRefreshing ? 180 : 0
+                  Behavior on rotation { NumberAnimation { duration: 400 } }
+                }
+                Rectangle {
+                  implicitHeight: 16
+                  implicitWidth: keyRefTxt.implicitWidth + 6
+                  radius: 3
+                  color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.1)
+                  Text {
+                    id: keyRefTxt
+                    anchors.centerIn: parent
+                    text: "G"
+                    font.pixelSize: 9
+                    font.weight: Font.Bold
+                    color: Color.muted
+                  }
+                }
               }
             }
 
@@ -756,7 +813,10 @@ Item {
                 anchors.fill: parent
                 hoverEnabled: true
                 cursorShape: Qt.PointingHandCursor
-                onClicked: root.openCreateModal()
+                onClicked: {
+                  root.openCreateModal()
+                  keyCatcher.forceActiveFocus()
+                }
               }
 
               RowLayout {
@@ -774,13 +834,27 @@ Item {
                   font.weight: Font.DemiBold
                   color: Color.background
                 }
+                Rectangle {
+                  implicitHeight: 16
+                  implicitWidth: keyNewTxt.implicitWidth + 6
+                  radius: 3
+                  color: Qt.rgba(0, 0, 0, 0.25)
+                  Text {
+                    id: keyNewTxt
+                    anchors.centerIn: parent
+                    text: "C"
+                    font.pixelSize: 9
+                    font.weight: Font.Bold
+                    color: Color.background
+                  }
+                }
               }
             }
 
             // Close Window Button
             Rectangle {
               implicitHeight: 34
-              implicitWidth: 34
+              implicitWidth: closeBtnLayout.implicitWidth + 16
               radius: 8
               color: closeMouse.containsMouse ? Qt.rgba(Color.urgent.r, Color.urgent.g, Color.urgent.b, 0.2) : Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.04)
               border.color: closeMouse.containsMouse ? Color.urgent : Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.12)
@@ -794,11 +868,29 @@ Item {
                 onClicked: root.dismiss()
               }
 
-              Text {
+              RowLayout {
+                id: closeBtnLayout
                 anchors.centerIn: parent
-                text: "󰅖"
-                font.pixelSize: 14
-                color: closeMouse.containsMouse ? Color.urgent : Color.muted
+                spacing: 5
+                Text {
+                  text: "󰅖"
+                  font.pixelSize: 13
+                  color: closeMouse.containsMouse ? Color.urgent : Color.muted
+                }
+                Rectangle {
+                  implicitHeight: 16
+                  implicitWidth: keyEscTxt.implicitWidth + 6
+                  radius: 3
+                  color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.1)
+                  Text {
+                    id: keyEscTxt
+                    anchors.centerIn: parent
+                    text: "Esc"
+                    font.pixelSize: 9
+                    font.weight: Font.Bold
+                    color: Color.muted
+                  }
+                }
               }
             }
           }
@@ -972,16 +1064,16 @@ Item {
             spacing: 6
             Repeater {
               model: [
-                { id: "all", label: "All Points (" + root.snapshotsList.length + ")" },
-                { id: "update", label: "Pre-Update" },
-                { id: "manual", label: "Manual" },
-                { id: "pinned", label: "Pinned 📌" }
+                { id: "all", label: "All Points (" + root.snapshotsList.length + ")", key: "1" },
+                { id: "update", label: "Pre-Update", key: "2" },
+                { id: "manual", label: "Manual", key: "3" },
+                { id: "pinned", label: "Pinned 📌", key: "4" }
               ]
 
               Rectangle {
                 property bool selected: root.currentFilter === modelData.id
                 implicitHeight: 28
-                implicitWidth: chipText.implicitWidth + 20
+                implicitWidth: chipRowLayout.implicitWidth + 20
                 radius: 14
                 color: selected ? Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.2) : Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.04)
                 border.color: selected ? Color.accent : Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.1)
@@ -990,16 +1082,39 @@ Item {
                 MouseArea {
                   anchors.fill: parent
                   cursorShape: Qt.PointingHandCursor
-                  onClicked: root.currentFilter = modelData.id
+                  onClicked: {
+                    root.currentFilter = modelData.id
+                    keyCatcher.forceActiveFocus()
+                  }
                 }
 
-                Text {
-                  id: chipText
+                RowLayout {
+                  id: chipRowLayout
                   anchors.centerIn: parent
-                  text: modelData.label
-                  font.pixelSize: 11
-                  font.weight: selected ? Font.Bold : Font.Normal
-                  color: selected ? Color.accent : Color.muted
+                  spacing: 6
+
+                  Text {
+                    id: chipText
+                    text: modelData.label
+                    font.pixelSize: 11
+                    font.weight: selected ? Font.Bold : Font.Normal
+                    color: selected ? Color.accent : Color.muted
+                  }
+
+                  Rectangle {
+                    implicitHeight: 16
+                    implicitWidth: chipKeyText.implicitWidth + 6
+                    radius: 3
+                    color: selected ? Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.35) : Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.08)
+                    Text {
+                      id: chipKeyText
+                      anchors.centerIn: parent
+                      text: modelData.key
+                      font.pixelSize: 9
+                      font.weight: Font.Bold
+                      color: selected ? Color.accent : Color.muted
+                    }
+                  }
                 }
               }
             }
@@ -1010,7 +1125,7 @@ Item {
           // Search Field
           Rectangle {
             implicitHeight: 28
-            implicitWidth: 180
+            implicitWidth: 190
             radius: 14
             color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.04)
             border.color: searchInput.activeFocus ? Color.accent : Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.1)
@@ -1028,7 +1143,7 @@ Item {
                 color: Color.muted
               }
 
-                TextInput {
+              TextInput {
                 id: searchInput
                 Layout.fillWidth: true
                 font.pixelSize: 11
@@ -1057,6 +1172,23 @@ Item {
                 }
               }
 
+              // Key hint [/] when input is inactive and empty
+              Rectangle {
+                visible: searchInput.text.length === 0 && !searchInput.activeFocus
+                implicitHeight: 16
+                implicitWidth: searchKeyBadge.implicitWidth + 6
+                radius: 3
+                color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.08)
+                Text {
+                  id: searchKeyBadge
+                  anchors.centerIn: parent
+                  text: "/"
+                  font.pixelSize: 9
+                  font.weight: Font.Bold
+                  color: Color.muted
+                }
+              }
+
               Text {
                 visible: searchInput.text.length > 0
                 text: "󰅖"
@@ -1076,16 +1208,16 @@ Item {
         }
 
         // Snapshots Timeline List
-        ScrollView {
+        ListView {
+          id: timelineView
           Layout.fillWidth: true
           Layout.fillHeight: true
           clip: true
-
-          ListView {
-            id: timelineView
-            width: parent.width
-            spacing: 8
-            model: root.filteredSnapshots
+          spacing: 8
+          model: root.filteredSnapshots
+          ScrollBar.vertical: ScrollBar {
+            policy: ScrollBar.AsNeeded
+          }
 
             // Empty state placeholder
             Item {
@@ -1239,7 +1371,7 @@ Item {
                   // Diff Changes Button
                   Rectangle {
                     implicitHeight: 28
-                    implicitWidth: diffBtnLayout.implicitWidth + 16
+                    implicitWidth: diffBtnLayout.implicitWidth + 14
                     radius: 6
                     color: diffHover.containsMouse ? Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.2) : Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.08)
                     border.color: Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.3)
@@ -1250,22 +1382,40 @@ Item {
                       anchors.fill: parent
                       hoverEnabled: true
                       cursorShape: Qt.PointingHandCursor
-                      onClicked: root.inspectDiff(modelData.id)
+                      onClicked: {
+                        root.selectedIndex = index
+                        root.inspectDiff(modelData.id)
+                        keyCatcher.forceActiveFocus()
+                      }
                     }
 
                     RowLayout {
                       id: diffBtnLayout
                       anchors.centerIn: parent
-                      spacing: 4
+                      spacing: 5
                       Text { text: "󰙅"; font.pixelSize: 11; color: Color.accent }
                       Text { text: "Diff"; font.pixelSize: 11; font.weight: Font.Medium; color: Color.accent }
+                      Rectangle {
+                        implicitHeight: 15
+                        implicitWidth: diffKeyTxt.implicitWidth + 6
+                        radius: 3
+                        color: Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.25)
+                        Text {
+                          id: diffKeyTxt
+                          anchors.centerIn: parent
+                          text: "D"
+                          font.pixelSize: 8
+                          font.weight: Font.Bold
+                          color: Color.accent
+                        }
+                      }
                     }
                   }
 
                   // Browse Files Button
                   Rectangle {
                     implicitHeight: 28
-                    implicitWidth: browseBtnLayout.implicitWidth + 16
+                    implicitWidth: browseBtnLayout.implicitWidth + 14
                     radius: 6
                     color: browseHover.containsMouse ? Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.08) : Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.04)
                     border.color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.1)
@@ -1276,22 +1426,40 @@ Item {
                       anchors.fill: parent
                       hoverEnabled: true
                       cursorShape: Qt.PointingHandCursor
-                      onClicked: root.browseSnapshot(modelData.id)
+                      onClicked: {
+                        root.selectedIndex = index
+                        root.browseSnapshot(modelData.id)
+                        keyCatcher.forceActiveFocus()
+                      }
                     }
 
                     RowLayout {
                       id: browseBtnLayout
                       anchors.centerIn: parent
-                      spacing: 4
+                      spacing: 5
                       Text { text: "󰝰"; font.pixelSize: 11; color: Color.muted }
                       Text { text: "Browse"; font.pixelSize: 11; font.weight: Font.Medium; color: Color.foreground }
+                      Rectangle {
+                        implicitHeight: 15
+                        implicitWidth: browseKeyTxt.implicitWidth + 6
+                        radius: 3
+                        color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.1)
+                        Text {
+                          id: browseKeyTxt
+                          anchors.centerIn: parent
+                          text: "B"
+                          font.pixelSize: 8
+                          font.weight: Font.Bold
+                          color: Color.muted
+                        }
+                      }
                     }
                   }
 
                   // Pin / Unpin Button
                   Rectangle {
                     implicitHeight: 28
-                    implicitWidth: 28
+                    implicitWidth: pinBtnLayout.implicitWidth + 12
                     radius: 6
                     color: pinHover.containsMouse ? Qt.rgba(0.96, 0.62, 0.04, 0.2) : Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.04)
                     border.color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.1)
@@ -1302,21 +1470,43 @@ Item {
                       anchors.fill: parent
                       hoverEnabled: true
                       cursorShape: Qt.PointingHandCursor
-                      onClicked: root.togglePin(modelData.id, modelData.important)
+                      onClicked: {
+                        root.selectedIndex = index
+                        root.togglePin(modelData.id, modelData.important)
+                        keyCatcher.forceActiveFocus()
+                      }
                     }
 
-                    Text {
+                    RowLayout {
+                      id: pinBtnLayout
                       anchors.centerIn: parent
-                      text: modelData.important ? "📌" : "󰤱"
-                      font.pixelSize: 12
-                      color: modelData.important ? "#F59E0B" : Color.muted
+                      spacing: 4
+                      Text {
+                        text: modelData.important ? "📌" : "󰤱"
+                        font.pixelSize: 11
+                        color: modelData.important ? "#F59E0B" : Color.muted
+                      }
+                      Rectangle {
+                        implicitHeight: 15
+                        implicitWidth: pinKeyTxt.implicitWidth + 6
+                        radius: 3
+                        color: Qt.rgba(0.96, 0.62, 0.04, 0.2)
+                        Text {
+                          id: pinKeyTxt
+                          anchors.centerIn: parent
+                          text: "P"
+                          font.pixelSize: 8
+                          font.weight: Font.Bold
+                          color: modelData.important ? "#F59E0B" : Color.muted
+                        }
+                      }
                     }
                   }
 
                   // Restore Button
                   Rectangle {
                     implicitHeight: 28
-                    implicitWidth: restoreBtnLayout.implicitWidth + 16
+                    implicitWidth: restoreBtnLayout.implicitWidth + 14
                     radius: 6
                     color: restoreHover.containsMouse ? Qt.rgba(0.06, 0.72, 0.51, 0.2) : Qt.rgba(0.06, 0.72, 0.51, 0.08)
                     border.color: Qt.rgba(0.06, 0.72, 0.51, 0.3)
@@ -1327,22 +1517,40 @@ Item {
                       anchors.fill: parent
                       hoverEnabled: true
                       cursorShape: Qt.PointingHandCursor
-                      onClicked: root.confirmRestore(modelData)
+                      onClicked: {
+                        root.selectedIndex = index
+                        root.confirmRestore(modelData)
+                        keyCatcher.forceActiveFocus()
+                      }
                     }
 
                     RowLayout {
                       id: restoreBtnLayout
                       anchors.centerIn: parent
-                      spacing: 4
+                      spacing: 5
                       Text { text: "󰁯"; font.pixelSize: 11; color: "#10B981" }
                       Text { text: "Restore"; font.pixelSize: 11; font.weight: Font.Medium; color: "#10B981" }
+                      Rectangle {
+                        implicitHeight: 15
+                        implicitWidth: resKeyTxt.implicitWidth + 6
+                        radius: 3
+                        color: Qt.rgba(0.06, 0.72, 0.51, 0.25)
+                        Text {
+                          id: resKeyTxt
+                          anchors.centerIn: parent
+                          text: "R"
+                          font.pixelSize: 8
+                          font.weight: Font.Bold
+                          color: "#10B981"
+                        }
+                      }
                     }
                   }
 
                   // Delete Button
                   Rectangle {
                     implicitHeight: 28
-                    implicitWidth: 28
+                    implicitWidth: delBtnLayout.implicitWidth + 12
                     radius: 6
                     color: delHover.containsMouse ? Qt.rgba(Color.urgent.r, Color.urgent.g, Color.urgent.b, 0.2) : Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.04)
                     border.color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.1)
@@ -1353,157 +1561,386 @@ Item {
                       anchors.fill: parent
                       hoverEnabled: true
                       cursorShape: Qt.PointingHandCursor
-                      onClicked: root.confirmDelete(modelData)
+                      onClicked: {
+                        root.selectedIndex = index
+                        root.confirmDelete(modelData)
+                        keyCatcher.forceActiveFocus()
+                      }
                     }
 
-                    Text {
+                    RowLayout {
+                      id: delBtnLayout
                       anchors.centerIn: parent
-                      text: "󰆴"
-                      font.pixelSize: 12
-                      color: delHover.containsMouse ? Color.urgent : Color.muted
+                      spacing: 4
+                      Text {
+                        text: "󰆴"
+                        font.pixelSize: 11
+                        color: delHover.containsMouse ? Color.urgent : Color.muted
+                      }
+                      Rectangle {
+                        implicitHeight: 15
+                        implicitWidth: delKeyTxt.implicitWidth + 6
+                        radius: 3
+                        color: Qt.rgba(Color.urgent.r, Color.urgent.g, Color.urgent.b, 0.2)
+                        Text {
+                          id: delKeyTxt
+                          anchors.centerIn: parent
+                          text: "X"
+                          font.pixelSize: 8
+                          font.weight: Font.Bold
+                          color: Color.urgent
+                        }
+                      }
                     }
                   }
                 }
               }
             }
           }
-        }
 
         // Keyboard Shortcuts Footer Hint Bar
         Rectangle {
           Layout.fillWidth: true
-          implicitHeight: 30
-          radius: 6
+          implicitHeight: 34
+          radius: 8
           color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.03)
-          border.color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.06)
+          border.color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.08)
           border.width: 1
 
           RowLayout {
             anchors.fill: parent
-            anchors.leftMargin: 12
-            anchors.rightMargin: 12
-            spacing: 12
+            anchors.leftMargin: 10
+            anchors.rightMargin: 10
+            spacing: 8
 
-            RowLayout {
-              spacing: 4
-              Rectangle {
-                implicitHeight: 18
-                implicitWidth: keyTxt1.implicitWidth + 8
-                radius: 4
-                color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.08)
-                Text { id: keyTxt1; anchors.centerIn: parent; text: "J/K"; font.pixelSize: 10; font.weight: Font.Bold; color: Color.foreground }
+            // Hint: Select
+            Rectangle {
+              implicitHeight: 24
+              implicitWidth: h1Layout.implicitWidth + 10
+              radius: 4
+              color: h1Mouse.containsMouse ? Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.08) : "transparent"
+              MouseArea {
+                id: h1Mouse
+                anchors.fill: parent
+                hoverEnabled: true
+                cursorShape: Qt.PointingHandCursor
+                onClicked: { root.selectNext(); keyCatcher.forceActiveFocus() }
               }
-              Text { text: "Select"; font.pixelSize: 10; color: Color.muted }
+              RowLayout {
+                id: h1Layout
+                anchors.centerIn: parent
+                spacing: 4
+                Rectangle {
+                  implicitHeight: 17
+                  implicitWidth: keyTxt1.implicitWidth + 6
+                  radius: 3
+                  color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.1)
+                  Text { id: keyTxt1; anchors.centerIn: parent; text: "J/K"; font.pixelSize: 9; font.weight: Font.Bold; color: Color.foreground }
+                }
+                Text { text: "Select"; font.pixelSize: 10; color: Color.muted }
+              }
             }
 
-            RowLayout {
-              spacing: 4
-              Rectangle {
-                implicitHeight: 18
-                implicitWidth: keyTxt2.implicitWidth + 8
-                radius: 4
-                color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.08)
-                Text { id: keyTxt2; anchors.centerIn: parent; text: "C"; font.pixelSize: 10; font.weight: Font.Bold; color: Color.foreground }
+            // Hint: New
+            Rectangle {
+              implicitHeight: 24
+              implicitWidth: h2Layout.implicitWidth + 10
+              radius: 4
+              color: h2Mouse.containsMouse ? Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.12) : "transparent"
+              MouseArea {
+                id: h2Mouse
+                anchors.fill: parent
+                hoverEnabled: true
+                cursorShape: Qt.PointingHandCursor
+                onClicked: { root.openCreateModal(); keyCatcher.forceActiveFocus() }
               }
-              Text { text: "New"; font.pixelSize: 10; color: Color.muted }
+              RowLayout {
+                id: h2Layout
+                anchors.centerIn: parent
+                spacing: 4
+                Rectangle {
+                  implicitHeight: 17
+                  implicitWidth: keyTxt2.implicitWidth + 6
+                  radius: 3
+                  color: Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.2)
+                  Text { id: keyTxt2; anchors.centerIn: parent; text: "C"; font.pixelSize: 9; font.weight: Font.Bold; color: Color.accent }
+                }
+                Text { text: "New"; font.pixelSize: 10; color: Color.muted }
+              }
             }
 
-            RowLayout {
-              spacing: 4
-              Rectangle {
-                implicitHeight: 18
-                implicitWidth: keyTxt3.implicitWidth + 8
-                radius: 4
-                color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.08)
-                Text { id: keyTxt3; anchors.centerIn: parent; text: "D / ↵"; font.pixelSize: 10; font.weight: Font.Bold; color: Color.foreground }
+            // Hint: Diff
+            Rectangle {
+              implicitHeight: 24
+              implicitWidth: h3Layout.implicitWidth + 10
+              radius: 4
+              color: h3Mouse.containsMouse ? Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.08) : "transparent"
+              MouseArea {
+                id: h3Mouse
+                anchors.fill: parent
+                hoverEnabled: true
+                cursorShape: Qt.PointingHandCursor
+                onClicked: {
+                  if (root.selectedSnapshot) root.inspectDiff(root.selectedSnapshot.id)
+                  keyCatcher.forceActiveFocus()
+                }
               }
-              Text { text: "Diff"; font.pixelSize: 10; color: Color.muted }
+              RowLayout {
+                id: h3Layout
+                anchors.centerIn: parent
+                spacing: 4
+                Rectangle {
+                  implicitHeight: 17
+                  implicitWidth: keyTxt3.implicitWidth + 6
+                  radius: 3
+                  color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.1)
+                  Text { id: keyTxt3; anchors.centerIn: parent; text: "D / ↵"; font.pixelSize: 9; font.weight: Font.Bold; color: Color.foreground }
+                }
+                Text { text: "Diff"; font.pixelSize: 10; color: Color.muted }
+              }
             }
 
-            RowLayout {
-              spacing: 4
-              Rectangle {
-                implicitHeight: 18
-                implicitWidth: keyTxt4.implicitWidth + 8
-                radius: 4
-                color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.08)
-                Text { id: keyTxt4; anchors.centerIn: parent; text: "B"; font.pixelSize: 10; font.weight: Font.Bold; color: Color.foreground }
+            // Hint: Browse
+            Rectangle {
+              implicitHeight: 24
+              implicitWidth: h4Layout.implicitWidth + 10
+              radius: 4
+              color: h4Mouse.containsMouse ? Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.08) : "transparent"
+              MouseArea {
+                id: h4Mouse
+                anchors.fill: parent
+                hoverEnabled: true
+                cursorShape: Qt.PointingHandCursor
+                onClicked: {
+                  if (root.selectedSnapshot) root.browseSnapshot(root.selectedSnapshot.id)
+                  keyCatcher.forceActiveFocus()
+                }
               }
-              Text { text: "Browse"; font.pixelSize: 10; color: Color.muted }
+              RowLayout {
+                id: h4Layout
+                anchors.centerIn: parent
+                spacing: 4
+                Rectangle {
+                  implicitHeight: 17
+                  implicitWidth: keyTxt4.implicitWidth + 6
+                  radius: 3
+                  color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.1)
+                  Text { id: keyTxt4; anchors.centerIn: parent; text: "B"; font.pixelSize: 9; font.weight: Font.Bold; color: Color.foreground }
+                }
+                Text { text: "Browse"; font.pixelSize: 10; color: Color.muted }
+              }
             }
 
-            RowLayout {
-              spacing: 4
-              Rectangle {
-                implicitHeight: 18
-                implicitWidth: keyTxt5.implicitWidth + 8
-                radius: 4
-                color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.08)
-                Text { id: keyTxt5; anchors.centerIn: parent; text: "P"; font.pixelSize: 10; font.weight: Font.Bold; color: Color.foreground }
+            // Hint: Pin
+            Rectangle {
+              implicitHeight: 24
+              implicitWidth: h5Layout.implicitWidth + 10
+              radius: 4
+              color: h5Mouse.containsMouse ? Qt.rgba(0.96, 0.62, 0.04, 0.12) : "transparent"
+              MouseArea {
+                id: h5Mouse
+                anchors.fill: parent
+                hoverEnabled: true
+                cursorShape: Qt.PointingHandCursor
+                onClicked: {
+                  if (root.selectedSnapshot) root.togglePin(root.selectedSnapshot.id, root.selectedSnapshot.important)
+                  keyCatcher.forceActiveFocus()
+                }
               }
-              Text { text: "Pin"; font.pixelSize: 10; color: Color.muted }
+              RowLayout {
+                id: h5Layout
+                anchors.centerIn: parent
+                spacing: 4
+                Rectangle {
+                  implicitHeight: 17
+                  implicitWidth: keyTxt5.implicitWidth + 6
+                  radius: 3
+                  color: Qt.rgba(0.96, 0.62, 0.04, 0.2)
+                  Text { id: keyTxt5; anchors.centerIn: parent; text: "P"; font.pixelSize: 9; font.weight: Font.Bold; color: "#F59E0B" }
+                }
+                Text { text: "Pin"; font.pixelSize: 10; color: Color.muted }
+              }
             }
 
-            RowLayout {
-              spacing: 4
-              Rectangle {
-                implicitHeight: 18
-                implicitWidth: keyTxt6.implicitWidth + 8
-                radius: 4
-                color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.08)
-                Text { id: keyTxt6; anchors.centerIn: parent; text: "R"; font.pixelSize: 10; font.weight: Font.Bold; color: "#10B981" }
+            // Hint: Restore
+            Rectangle {
+              implicitHeight: 24
+              implicitWidth: h6Layout.implicitWidth + 10
+              radius: 4
+              color: h6Mouse.containsMouse ? Qt.rgba(0.06, 0.72, 0.51, 0.12) : "transparent"
+              MouseArea {
+                id: h6Mouse
+                anchors.fill: parent
+                hoverEnabled: true
+                cursorShape: Qt.PointingHandCursor
+                onClicked: {
+                  if (root.showRestoreModal) root.executeRestore()
+                  else if (root.selectedSnapshot) root.confirmRestore(root.selectedSnapshot)
+                  keyCatcher.forceActiveFocus()
+                }
               }
-              Text { text: "Restore"; font.pixelSize: 10; color: Color.muted }
+              RowLayout {
+                id: h6Layout
+                anchors.centerIn: parent
+                spacing: 4
+                Rectangle {
+                  implicitHeight: 17
+                  implicitWidth: keyTxt6.implicitWidth + 6
+                  radius: 3
+                  color: Qt.rgba(0.06, 0.72, 0.51, 0.2)
+                  Text { id: keyTxt6; anchors.centerIn: parent; text: "R"; font.pixelSize: 9; font.weight: Font.Bold; color: "#10B981" }
+                }
+                Text { text: "Restore"; font.pixelSize: 10; color: Color.muted }
+              }
             }
 
-            RowLayout {
-              spacing: 4
-              Rectangle {
-                implicitHeight: 18
-                implicitWidth: keyTxt7.implicitWidth + 8
-                radius: 4
-                color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.08)
-                Text { id: keyTxt7; anchors.centerIn: parent; text: "X"; font.pixelSize: 10; font.weight: Font.Bold; color: Color.urgent }
+            // Hint: Delete
+            Rectangle {
+              implicitHeight: 24
+              implicitWidth: h7Layout.implicitWidth + 10
+              radius: 4
+              color: h7Mouse.containsMouse ? Qt.rgba(Color.urgent.r, Color.urgent.g, Color.urgent.b, 0.12) : "transparent"
+              MouseArea {
+                id: h7Mouse
+                anchors.fill: parent
+                hoverEnabled: true
+                cursorShape: Qt.PointingHandCursor
+                onClicked: {
+                  if (root.showDeleteModal) root.executeDelete()
+                  else if (root.selectedSnapshot) root.confirmDelete(root.selectedSnapshot)
+                  keyCatcher.forceActiveFocus()
+                }
               }
-              Text { text: "Delete"; font.pixelSize: 10; color: Color.muted }
+              RowLayout {
+                id: h7Layout
+                anchors.centerIn: parent
+                spacing: 4
+                Rectangle {
+                  implicitHeight: 17
+                  implicitWidth: keyTxt7.implicitWidth + 6
+                  radius: 3
+                  color: Qt.rgba(Color.urgent.r, Color.urgent.g, Color.urgent.b, 0.2)
+                  Text { id: keyTxt7; anchors.centerIn: parent; text: "X"; font.pixelSize: 9; font.weight: Font.Bold; color: Color.urgent }
+                }
+                Text { text: "Delete"; font.pixelSize: 10; color: Color.muted }
+              }
             }
 
-            RowLayout {
-              spacing: 4
-              Rectangle {
-                implicitHeight: 18
-                implicitWidth: keyTxt8.implicitWidth + 8
-                radius: 4
-                color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.08)
-                Text { id: keyTxt8; anchors.centerIn: parent; text: "F"; font.pixelSize: 10; font.weight: Font.Bold; color: Color.foreground }
+            // Hint: Filter
+            Rectangle {
+              implicitHeight: 24
+              implicitWidth: h8Layout.implicitWidth + 10
+              radius: 4
+              color: h8Mouse.containsMouse ? Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.08) : "transparent"
+              MouseArea {
+                id: h8Mouse
+                anchors.fill: parent
+                hoverEnabled: true
+                cursorShape: Qt.PointingHandCursor
+                onClicked: { root.cycleFilter(1); keyCatcher.forceActiveFocus() }
               }
-              Text { text: "Filter"; font.pixelSize: 10; color: Color.muted }
+              RowLayout {
+                id: h8Layout
+                anchors.centerIn: parent
+                spacing: 4
+                Rectangle {
+                  implicitHeight: 17
+                  implicitWidth: keyTxt8.implicitWidth + 6
+                  radius: 3
+                  color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.1)
+                  Text { id: keyTxt8; anchors.centerIn: parent; text: "1-4 / F"; font.pixelSize: 9; font.weight: Font.Bold; color: Color.foreground }
+                }
+                Text { text: "Filter"; font.pixelSize: 10; color: Color.muted }
+              }
             }
 
-            RowLayout {
-              spacing: 4
-              Rectangle {
-                implicitHeight: 18
-                implicitWidth: keyTxt9.implicitWidth + 8
-                radius: 4
-                color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.08)
-                Text { id: keyTxt9; anchors.centerIn: parent; text: "G"; font.pixelSize: 10; font.weight: Font.Bold; color: Color.foreground }
+            // Hint: Search
+            Rectangle {
+              implicitHeight: 24
+              implicitWidth: hSearchLayout.implicitWidth + 10
+              radius: 4
+              color: hSearchMouse.containsMouse ? Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.08) : "transparent"
+              MouseArea {
+                id: hSearchMouse
+                anchors.fill: parent
+                hoverEnabled: true
+                cursorShape: Qt.PointingHandCursor
+                onClicked: {
+                  searchInput.forceActiveFocus()
+                  searchInput.selectAll()
+                }
               }
-              Text { text: "Refresh"; font.pixelSize: 10; color: Color.muted }
+              RowLayout {
+                id: hSearchLayout
+                anchors.centerIn: parent
+                spacing: 4
+                Rectangle {
+                  implicitHeight: 17
+                  implicitWidth: keyTxtSearch.implicitWidth + 6
+                  radius: 3
+                  color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.1)
+                  Text { id: keyTxtSearch; anchors.centerIn: parent; text: "/"; font.pixelSize: 9; font.weight: Font.Bold; color: Color.foreground }
+                }
+                Text { text: "Search"; font.pixelSize: 10; color: Color.muted }
+              }
+            }
+
+            // Hint: Refresh
+            Rectangle {
+              implicitHeight: 24
+              implicitWidth: h9Layout.implicitWidth + 10
+              radius: 4
+              color: h9Mouse.containsMouse ? Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.08) : "transparent"
+              MouseArea {
+                id: h9Mouse
+                anchors.fill: parent
+                hoverEnabled: true
+                cursorShape: Qt.PointingHandCursor
+                onClicked: { root.refresh(); keyCatcher.forceActiveFocus() }
+              }
+              RowLayout {
+                id: h9Layout
+                anchors.centerIn: parent
+                spacing: 4
+                Rectangle {
+                  implicitHeight: 17
+                  implicitWidth: keyTxt9.implicitWidth + 6
+                  radius: 3
+                  color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.1)
+                  Text { id: keyTxt9; anchors.centerIn: parent; text: "G"; font.pixelSize: 9; font.weight: Font.Bold; color: Color.foreground }
+                }
+                Text { text: "Refresh"; font.pixelSize: 10; color: Color.muted }
+              }
             }
 
             Item { Layout.fillWidth: true }
 
-            RowLayout {
-              spacing: 4
-              Rectangle {
-                implicitHeight: 18
-                implicitWidth: keyTxt10.implicitWidth + 8
-                radius: 4
-                color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.08)
-                Text { id: keyTxt10; anchors.centerIn: parent; text: "Esc / Q"; font.pixelSize: 10; font.weight: Font.Bold; color: Color.foreground }
+            // Hint: Close
+            Rectangle {
+              implicitHeight: 24
+              implicitWidth: h10Layout.implicitWidth + 10
+              radius: 4
+              color: h10Mouse.containsMouse ? Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.08) : "transparent"
+              MouseArea {
+                id: h10Mouse
+                anchors.fill: parent
+                hoverEnabled: true
+                cursorShape: Qt.PointingHandCursor
+                onClicked: root.dismiss()
               }
-              Text { text: "Close"; font.pixelSize: 10; color: Color.muted }
+              RowLayout {
+                id: h10Layout
+                anchors.centerIn: parent
+                spacing: 4
+                Rectangle {
+                  implicitHeight: 17
+                  implicitWidth: keyTxt10.implicitWidth + 6
+                  radius: 3
+                  color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.1)
+                  Text { id: keyTxt10; anchors.centerIn: parent; text: "Esc / Q"; font.pixelSize: 9; font.weight: Font.Bold; color: Color.foreground }
+                }
+                Text { text: "Close"; font.pixelSize: 10; color: Color.muted }
+              }
             }
           }
         }
