@@ -61,7 +61,7 @@ def print_table(data):
 
 def main():
     parser = argparse.ArgumentParser(description="Omarchy Snapshots CLI")
-    parser.add_argument("command", nargs="?", default="list", choices=["list", "create", "delete", "pin", "unpin", "diff", "authorize", "json", "gui", "toggle", "open", "show"], help="Command to run")
+    parser.add_argument("command", nargs="?", default="list", choices=["list", "create", "delete", "pin", "unpin", "diff", "authorize", "json", "gui", "toggle", "open", "show", "restore"], help="Command to run")
     parser.add_argument("--desc", default="", help="Description for new snapshot")
     parser.add_argument("--id", type=int, help="Snapshot ID")
     parser.add_argument("--important", action="store_true", help="Pin snapshot against auto-cleanup")
@@ -98,6 +98,19 @@ def main():
             print(f"\033[1;32m✓\033[0m {res.get('message', 'Snapshot created.')}")
         else:
             print(f"\033[1;31m✗\033[0m {res.get('error', 'Creation failed.')}")
+            sys.exit(1)
+    elif args.command == "restore":
+        if args.id is None:
+            print("Error: --id is required for restore.")
+            sys.exit(1)
+        core_args = ["restore", "--id", str(args.id)]
+        if args.mock:
+            core_args.append("--mock")
+        res = run_core(core_args)
+        if res.get("ok"):
+            print(f"\033[1;32m✓\033[0m {res.get('message', 'System restore initiated.')}")
+        else:
+            print(f"\033[1;31m✗\033[0m {res.get('error', 'Restore failed.')}")
             sys.exit(1)
     elif args.command == "delete":
         if args.id is None:

@@ -348,21 +348,80 @@ def get_live_status():
     }
 
 def create_snapshot(description, config="root", important=False, mock=False):
+    desc = (description or "").strip() or f"Manual checkpoint {datetime.now().strftime('%Y-%m-%d %H:%M')}"
     if mock:
-        return {"ok": True, "message": f"[Mock] Snapshot '{description}' created successfully."}
+        return {"ok": True, "snapshotId": 20, "message": f"[Mock] Snapshot '{desc}' created successfully."}
 
-    cmd = ["snapper", "-c", config, "create", "-c", "number", "-d", description]
+    cmd = ["snapper", "-c", config, "create", "-c", "number", "-p", "-d", desc]
     if important:
         cmd.extend(["-u", "important=yes"])
 
     rc, out, err = run_cmd(cmd)
-    if rc != 0 and ("permission" in err.lower() or "must be root" in err.lower()):
+    if rc != 0 and any(w in err.lower() for w in ["permission", "must be root", "denied", "auth"]):
         # Try privileged
         rc, out, err = run_privileged(cmd)
 
     if rc == 0:
-        return {"ok": True, "message": f"Snapshot '{description}' created successfully."}
+        snap_id = out.strip()
+        msg = f"Snapshot #{snap_id} ('{desc}') created successfully." if snap_id.isdigit() else f"Snapshot '{desc}' created successfully."
+        return {
+            "ok": True,
+            "snapshotId": int(snap_id) if snap_id.isdigit() else None,
+            "message": msg
+        }
     return {"ok": False, "error": err or "Failed to create snapshot."}
+
+def restore_snapshot(snap_id, config="root", mock=False):
+    """
+    Restore root filesystem to a specified snapshot.
+    In mock mode: returns simulated success.
+    In live mode: validates that snap_id exists, and invokes recovery.
+    """
+    if mock:
+        return {
+            "ok": True,
+            "snapshotId": snap_id,
+            "message": f"[Mock] System restore to snapshot #{snap_id} initiated successfully. Reboot will finalize rollback."
+        }
+
+    # Verify that the snapshot exists
+    st = get_live_status()
+    found = False
+    for cfg in st.get("configs", []):
+        if cfg.get("name") == config or not config:
+            for s in cfg.get("snapshots", []):
+                if s.get("id") == snap_id:
+                    found = True
+                    break
+    if not found:
+        return {"ok": False, "error": f"Snapshot #{snap_id} does not exist in Snapper config '{config}'."}
+
+    # Execute restore
+    if os.path.exists("/usr/bin/limine-snapper-restore"):
+        if os.environ.get("WAYLAND_DISPLAY") or os.environ.get("DISPLAY"):
+            launcher = "/home/ac/Work/omarchy/bin/omarchy-launch-tui"
+            if os.path.exists(launcher):
+                cmd = [launcher, "--title=Snapshot Recovery", "sudo", "limine-snapper-restore"]
+                subprocess.Popen(cmd)
+                return {
+                    "ok": True,
+                    "snapshotId": snap_id,
+                    "message": f"Recovery interface launched for snapshot #{snap_id}. Follow terminal prompts to complete."
+                }
+            else:
+                rc, out, err = run_privileged(["limine-snapper-restore"])
+        else:
+            rc, out, err = run_privileged(["limine-snapper-restore"])
+    else:
+        rc, out, err = run_privileged(["snapper", "-c", config, "rollback", str(snap_id)])
+
+    if rc == 0:
+        return {
+            "ok": True,
+            "snapshotId": snap_id,
+            "message": f"System restore to snapshot #{snap_id} staged successfully. Reboot to activate."
+        }
+    return {"ok": False, "error": err or "Failed to initiate snapshot restore."}
 
 def delete_snapshot(snap_id, config="root", mock=False):
     if mock:
@@ -467,7 +526,7 @@ def authorize_access(config="root"):
 
 def main():
     parser = argparse.ArgumentParser(description="Omarchy Snapshots Backend Core")
-    parser.add_argument("command", choices=["status", "create", "delete", "pin", "unpin", "diff", "authorize"], help="Action to execute")
+    parser.add_argument("command", choices=["status", "create", "delete", "pin", "unpin", "diff", "authorize", "restore"], help="Action to execute")
     parser.add_argument("--mock", action="store_true", help="Output mock data for testing or preview")
     parser.add_argument("--config", default="root", help="Snapper config name (default: root)")
     parser.add_argument("--desc", default="", help="Description for snapshot creation")
@@ -482,6 +541,13 @@ def main():
     elif args.command == "create":
         desc = args.desc.strip() or f"Manual checkpoint {datetime.now().strftime('%Y-%m-%d %H:%M')}"
         res = create_snapshot(desc, config=args.config, important=args.important, mock=args.mock)
+        print(json.dumps(res, indent=2))
+        sys.exit(0 if res.get("ok") else 1)
+    elif args.command == "restore":
+        if args.id is None:
+            print(json.dumps({"ok": False, "error": "--id is required for restore"}))
+            sys.exit(1)
+        res = restore_snapshot(args.id, config=args.config, mock=args.mock)
         print(json.dumps(res, indent=2))
         sys.exit(0 if res.get("ok") else 1)
     elif args.command == "delete":

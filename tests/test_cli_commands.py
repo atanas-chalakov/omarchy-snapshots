@@ -26,6 +26,7 @@ class TestCliCommands(unittest.TestCase):
         self.assertIn("Omarchy Snapshots CLI", res.stdout)
         self.assertIn("list", res.stdout)
         self.assertIn("create", res.stdout)
+        self.assertIn("restore", res.stdout)
         self.assertIn("delete", res.stdout)
 
     def test_core_help(self):
@@ -64,10 +65,21 @@ class TestCliCommands(unittest.TestCase):
         self.assertEqual(res.returncode, 0)
         self.assertIn("Test Checkpoint Alpha", res.stdout)
 
+    def test_cli_create_mock_default_desc(self):
+        res = self.run_cmd(CLI_BIN, ["create", "--mock"])
+        self.assertEqual(res.returncode, 0)
+        self.assertIn("Manual checkpoint", res.stdout)
+
     def test_cli_create_important_mock(self):
         res = self.run_cmd(CLI_BIN, ["create", "--desc", "Pinned Checkpoint Beta", "--important", "--mock"])
         self.assertEqual(res.returncode, 0)
         self.assertIn("Pinned Checkpoint Beta", res.stdout)
+
+    def test_cli_restore_mock(self):
+        res = self.run_cmd(CLI_BIN, ["restore", "--id", "19", "--mock"])
+        self.assertEqual(res.returncode, 0)
+        self.assertIn("restore", res.stdout.lower())
+        self.assertIn("19", res.stdout)
 
     def test_cli_pin_unpin_mock(self):
         res_pin = self.run_cmd(CLI_BIN, ["pin", "--id", "18", "--mock"])
@@ -86,6 +98,11 @@ class TestCliCommands(unittest.TestCase):
     # Error handling test cases
     def test_missing_id_diff(self):
         res = self.run_cmd(CLI_BIN, ["diff", "--mock"])
+        self.assertNotEqual(res.returncode, 0)
+        self.assertIn("--id is required", (res.stdout + res.stderr))
+
+    def test_missing_id_restore(self):
+        res = self.run_cmd(CLI_BIN, ["restore", "--mock"])
         self.assertNotEqual(res.returncode, 0)
         self.assertIn("--id is required", (res.stdout + res.stderr))
 

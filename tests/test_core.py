@@ -72,6 +72,25 @@ class TestSnapshotsCore(unittest.TestCase):
         self.assertTrue(data.get("ok"))
         self.assertIn("message", data)
 
+    def test_mock_create_fallback_desc(self):
+        data = self.run_core(["create", "--mock"])
+        self.assertTrue(data.get("ok"))
+        self.assertIn("Manual checkpoint", data.get("message", ""))
+        self.assertEqual(data.get("snapshotId"), 20)
+
+    def test_mock_restore(self):
+        data = self.run_core(["restore", "--id", "19", "--mock"])
+        self.assertTrue(data.get("ok"))
+        self.assertEqual(data.get("snapshotId"), 19)
+        self.assertIn("message", data)
+        self.assertIn("19", data.get("message", ""))
+
+    def test_restore_missing_id(self):
+        cmd = [CORE_BIN, "restore", "--mock"]
+        res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        self.assertNotEqual(res.returncode, 0)
+        self.assertIn("--id is required", (res.stdout + res.stderr))
+
     def test_mock_pin_unpin(self):
         pin_res = self.run_core(["pin", "--id", "18", "--mock"])
         self.assertTrue(pin_res.get("ok"))

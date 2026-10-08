@@ -35,13 +35,16 @@ run_suite "Official Omarchy Plugin Validator" "omarchy plugin validate \"$PROJEC
 # 2. Python Unit Engine Tests
 run_suite "Backend Engine Unit Tests" "python3 -m unittest \"$PROJECT_ROOT/tests/test_unit_engine.py\""
 
-# 3. CLI Subprocess & Command Tests
+# 3. Backend Core Schema & Subprocess Tests
+run_suite "Backend Core JSON Schema Tests" "python3 -m unittest \"$PROJECT_ROOT/tests/test_core.py\""
+
+# 4. CLI Subprocess & Command Tests
 run_suite "CLI & Subprocess Tests" "python3 -m unittest \"$PROJECT_ROOT/tests/test_cli_commands.py\""
 
-# 4. QML Syntax, Manifest & Asset Tests
+# 5. QML Syntax, Manifest & Asset Tests
 run_suite "QML, Manifest & Static Asset Tests" "python3 -m unittest \"$PROJECT_ROOT/tests/test_qml_and_manifest.py\""
 
-# 5. Live IPC and Desktop Lifecycle Tests
+# 6. Live IPC and Desktop Lifecycle Tests
 run_suite "Live Desktop & IPC Integration Tests" "python3 -m unittest \"$PROJECT_ROOT/tests/test_ipc_integration.py\""
 
 echo -e "${BLUE}============================================================${RESET}"

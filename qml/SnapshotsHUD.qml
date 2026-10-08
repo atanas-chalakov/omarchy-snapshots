@@ -103,11 +103,18 @@ Item {
     newSnapshotDesc = initialDesc || ""
     newSnapshotImportant = false
     showCreateModal = true
+    Qt.callLater(function() {
+      if (typeof createDescInput !== "undefined") {
+        createDescInput.forceActiveFocus()
+      }
+    })
   }
 
   function submitCreateSnapshot() {
-    if (!newSnapshotDesc.trim()) return
     var desc = newSnapshotDesc.trim()
+    if (!desc) {
+      desc = "Manual checkpoint " + Qt.formatDateTime(new Date(), "yyyy-MM-dd hh:mm")
+    }
     showCreateModal = false
     notify("Creating checkpoint '" + desc + "'...")
 
@@ -115,6 +122,7 @@ Item {
     if (newSnapshotImportant) args.push("--important")
     if (useMockData) args.push("--mock")
 
+    if (actionProcess.running) actionProcess.running = false
     actionProcess.command = args
     actionProcess.running = true
   }
@@ -124,6 +132,7 @@ Item {
     notify((currentImportant ? "Unpinning" : "Pinning") + " snapshot #" + snapId + "...")
     var args = [coreScript, action, "--id", String(snapId)]
     if (useMockData) args.push("--mock")
+    if (actionProcess.running) actionProcess.running = false
     actionProcess.command = args
     actionProcess.running = true
   }
@@ -158,8 +167,12 @@ Item {
     var id = activeRestoreSnapshot.id
     showRestoreModal = false
     notify("Launching recovery for snapshot #" + id + "...")
-    restoreProcess.command = ["pkexec", "limine-snapper-restore", String(id)]
-    restoreProcess.running = true
+    var args = [coreScript, "restore", "--id", String(id)]
+    if (useMockData) args.push("--mock")
+
+    if (actionProcess.running) actionProcess.running = false
+    actionProcess.command = args
+    actionProcess.running = true
   }
 
   function confirmDelete(snapshot) {
@@ -251,6 +264,7 @@ Item {
 
   Process {
     id: actionProcess
+    property string stderrOutput: ""
     stdout: StdioCollector {
       waitForEnd: true
       onStreamFinished: {
@@ -262,7 +276,23 @@ Item {
           } else {
             root.notify("Error: " + (res.error || "Action failed."))
           }
-        } catch(e) {}
+        } catch(e) {
+          if (text && text.trim().length > 0) {
+            root.notify(text.trim())
+            root.refresh()
+          }
+        }
+      }
+    }
+    stderr: StdioCollector {
+      waitForEnd: true
+      onStreamFinished: {
+        actionProcess.stderrOutput = text.trim()
+      }
+    }
+    onExited: function(exitCode) {
+      if (exitCode !== 0 && actionProcess.stderrOutput.length > 0) {
+        root.notify("Error: " + actionProcess.stderrOutput)
       }
     }
   }
@@ -1157,6 +1187,7 @@ Item {
                     onClicked: {
                       createDescInput.text = modelData
                       root.newSnapshotDesc = modelData
+                      createDescInput.forceActiveFocus()
                     }
                   }
 
@@ -1188,7 +1219,10 @@ Item {
                 color: Color.foreground
                 text: root.newSnapshotDesc
                 onTextChanged: root.newSnapshotDesc = text
-                focus: root.showCreateModal
+                focus: true
+                onAccepted: root.submitCreateSnapshot()
+                Keys.onReturnPressed: root.submitCreateSnapshot()
+                Keys.onEnterPressed: root.submitCreateSnapshot()
 
                 Text {
                   anchors.fill: parent
@@ -1270,7 +1304,7 @@ Item {
                 }
                 Text {
                   anchors.centerIn: parent
-                  text: "Create Snapshot"
+                  text: "Create Checkpoint"
                   font.pixelSize: 12
                   font.weight: Font.Bold
                   color: Color.background
@@ -1485,6 +1519,11 @@ Item {
           color: Color.background
           border.color: "#10B981"
           border.width: 1
+          focus: root.showRestoreModal
+
+          Keys.onEscapePressed: root.showRestoreModal = false
+          Keys.onReturnPressed: root.executeRestore()
+          Keys.onEnterPressed: root.executeRestore()
 
           MouseArea { anchors.fill: parent }
 

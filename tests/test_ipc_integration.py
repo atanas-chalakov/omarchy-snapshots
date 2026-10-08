@@ -70,6 +70,26 @@ class TestIpcIntegration(unittest.TestCase):
         self.assertEqual(res_toggle_off.returncode, 0)
         self.assertTrue(self.wait_for_window(False), "Window must close after toggle OFF")
 
+    def test_summon_with_create_action(self):
+        # Summon with create action and mock payload
+        res = self.run_cmd(["omarchy-shell", "shell", "summon", "ac.snapshots", '{"mock":true,"action":"create","desc":"IPC Checkpoint Test"}'])
+        self.assertEqual(res.returncode, 0)
+        self.assertEqual(res.stdout.strip(), "ok")
+        self.assertTrue(self.wait_for_window(True), "Window must open when summoned with create action")
+
+        self.run_cmd(["omarchy-shell", "-q", "shell", "hide", "ac.snapshots"])
+        self.assertTrue(self.wait_for_window(False))
+
+    def test_summon_with_restore_action(self):
+        # Summon with restore action and mock payload
+        res = self.run_cmd(["omarchy-shell", "shell", "summon", "ac.snapshots", '{"mock":true,"action":"restore","id":19}'])
+        self.assertEqual(res.returncode, 0)
+        self.assertEqual(res.stdout.strip(), "ok")
+        self.assertTrue(self.wait_for_window(True), "Window must open when summoned with restore action")
+
+        self.run_cmd(["omarchy-shell", "-q", "shell", "hide", "ac.snapshots"])
+        self.assertTrue(self.wait_for_window(False))
+
     @classmethod
     def tearDownClass(cls):
         # Always ensure HUD is hidden when tests conclude

@@ -113,6 +113,9 @@ omarchy-snapshots unpin --id 18
 # Delete a snapshot
 omarchy-snapshots delete --id 17
 
+# Restore / rollback system to a snapshot
+omarchy-snapshots restore --id 19
+
 # One-time authorization for passwordless desktop access
 omarchy-snapshots authorize
 

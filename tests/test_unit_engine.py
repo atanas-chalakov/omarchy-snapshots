@@ -85,10 +85,32 @@ class TestUnitEngine(unittest.TestCase):
         res1 = core.create_snapshot("Custom Test Checkpoint", mock=True)
         self.assertTrue(res1["ok"])
         self.assertIn("Custom Test Checkpoint", res1["message"])
+        self.assertEqual(res1.get("snapshotId"), 20)
 
         res2 = core.create_snapshot("Pinned Test", important=True, mock=True)
         self.assertTrue(res2["ok"])
         self.assertIn("Pinned Test", res2["message"])
+
+        # Test empty / whitespace description fallback
+        res3 = core.create_snapshot("", mock=True)
+        self.assertTrue(res3["ok"])
+        self.assertIn("Manual checkpoint", res3["message"])
+
+        res4 = core.create_snapshot("   ", mock=True)
+        self.assertTrue(res4["ok"])
+        self.assertIn("Manual checkpoint", res4["message"])
+
+    def test_restore_snapshot_mock(self):
+        res = core.restore_snapshot(19, mock=True)
+        self.assertTrue(res["ok"])
+        self.assertEqual(res["snapshotId"], 19)
+        self.assertIn("System restore to snapshot #19", res["message"])
+
+    def test_restore_snapshot_nonexistent_live(self):
+        # In live mode, asking to restore a non-existent snapshot ID must fail cleanly
+        res = core.restore_snapshot(999999, mock=False)
+        self.assertFalse(res["ok"])
+        self.assertIn("does not exist", res["error"])
 
     def test_delete_snapshot_mock(self):
         res = core.delete_snapshot(19, mock=True)
