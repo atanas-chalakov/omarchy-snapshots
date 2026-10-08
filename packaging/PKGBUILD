@@ -1,0 +1,53 @@
+# Maintainer: Atanas Chalakov <atanas@chalakov.com>
+pkgname=omarchy-snapshots
+pkgver=1.0.0
+pkgrel=1
+pkgdesc="Visual Btrfs & Snapper snapshot manager, diff inspector, and recovery HUD for Omarchy"
+arch=('any')
+url="https://github.com/atanas-chalakov/omarchy-snapshots"
+license=('MIT')
+depends=(
+    'bash'
+    'python'
+    'quickshell'
+    'omarchy-shell'
+    'snapper'
+    'btrfs-progs'
+)
+optdepends=(
+    'limine-snapper-sync: Automatic bootloader menu synchronization for snapshots'
+    'polkit: Graphical authorization for privileged snapshot management'
+)
+install="$pkgname.install"
+source=("$pkgname-$pkgver.tar.gz::$url/archive/refs/tags/v$pkgver.tar.gz")
+sha256sums=('SKIP')
+
+package() {
+    cd "$pkgname-$pkgver"
+
+    # Install plugin files
+    local plugindir="$pkgdir/usr/share/omarchy/plugins/ac.snapshots"
+    install -dm755 "$plugindir"
+    cp -r BarWidget.qml SnapshotsHUD.qml manifest.json plugin.json assets bin "$plugindir/"
+
+    # Install CLI launchers
+    install -Dm755 bin/omarchy-snapshots "$pkgdir/usr/bin/omarchy-snapshots"
+    install -Dm755 bin/omarchy-snapshots-core "$pkgdir/usr/bin/omarchy-snapshots-core"
+
+    # Install Freedesktop desktop entry
+    install -Dm644 omarchy-snapshots.desktop "$pkgdir/usr/share/applications/omarchy-snapshots.desktop"
+
+    # Install icons
+    install -Dm644 assets/icons/omarchy-snapshots.svg "$pkgdir/usr/share/icons/hicolor/scalable/apps/omarchy-snapshots.svg"
+    for s in 48 64 128 256 512; do
+        if [[ -f "assets/icons/omarchy-snapshots-$s.png" ]]; then
+            install -Dm644 "assets/icons/omarchy-snapshots-$s.png" "$pkgdir/usr/share/icons/hicolor/${s}x${s}/apps/omarchy-snapshots.png"
+        fi
+    done
+
+    # Install license
+    install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+
+    # Install documentation
+    install -Dm644 README.md "$pkgdir/usr/share/doc/$pkgname/README.md"
+}

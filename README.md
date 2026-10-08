@@ -64,16 +64,29 @@ Omarchy configures Btrfs and Snapper out-of-the-box, taking automatic snapshots 
 
 ## Installation
 
-### Method 1: Using the Omarchy CLI
+### Method 1: Automated Installer (Recommended)
+Clone the repository and run the setup script:
 ```bash
-omarchy plugin add https://github.com/atanas-chalakov/omarchy-snapshots --enable
+git clone https://github.com/atanas-chalakov/omarchy-snapshots.git
+cd omarchy-snapshots
+./install.sh
+```
+This automatically symlinks the plugin into `~/.config/omarchy/plugins/ac.snapshots`, links CLI launchers into `~/.local/bin`, installs application menu entries and icons, and enables the companion widget in your Omarchy status bar.
+
+To uninstall at any time:
+```bash
+./uninstall.sh
 ```
 
-### Method 2: Manual Clone
+### Method 2: Arch Linux (AUR / PKGBUILD)
 ```bash
-git clone https://github.com/atanas-chalakov/omarchy-snapshots ~/.config/omarchy/plugins/ac.snapshots
-omarchy-shell shell rescanPlugins
-omarchy plugin enable ac.snapshots
+cd packaging
+makepkg -si
+```
+
+### Method 3: Using the Omarchy CLI
+```bash
+omarchy plugin add https://github.com/atanas-chalakov/omarchy-snapshots --enable
 ```
 
 ---
@@ -121,6 +134,12 @@ omarchy-snapshots authorize
 
 # Output structured JSON for automation or scripting
 omarchy-snapshots json
+
+# Summon desktop HUD
+omarchy-snapshots gui
+omarchy-snapshots gui --action create   # Open directly to New Checkpoint dialog
+omarchy-snapshots gui --action diff     # Open directly to Diff inspector
+omarchy-snapshots gui --mock            # Open demo preview mode
 ```
 
 ---

@@ -62,6 +62,7 @@ def print_table(data):
 def main():
     parser = argparse.ArgumentParser(description="Omarchy Snapshots CLI")
     parser.add_argument("command", nargs="?", default="list", choices=["list", "create", "delete", "pin", "unpin", "diff", "authorize", "json", "gui", "toggle", "open", "show", "restore"], help="Command to run")
+    parser.add_argument("--action", choices=["create", "diff", "restore"], help="Initial action for HUD")
     parser.add_argument("--desc", default="", help="Description for new snapshot")
     parser.add_argument("--id", type=int, help="Snapshot ID")
     parser.add_argument("--important", action="store_true", help="Pin snapshot against auto-cleanup")
@@ -70,9 +71,21 @@ def main():
     args = parser.parse_args()
 
     if args.command in ["gui", "toggle", "open", "show"]:
-        cmd = ["omarchy-shell", "shell", "toggle", "ac.snapshots"]
+        payload = {}
         if args.mock:
-            cmd = ["omarchy-shell", "shell", "summon", "ac.snapshots", '{"mock":true}']
+            payload["mock"] = True
+        if args.action:
+            payload["action"] = args.action
+        if args.desc:
+            payload["action"] = "create"
+            payload["desc"] = args.desc
+        if args.id:
+            payload["id"] = args.id
+
+        if payload:
+            cmd = ["omarchy-shell", "shell", "summon", "ac.snapshots", json.dumps(payload)]
+        else:
+            cmd = ["omarchy-shell", "shell", "toggle", "ac.snapshots"]
         res = subprocess.run(cmd)
         sys.exit(res.returncode)
     elif args.command in ["list", "status"]:

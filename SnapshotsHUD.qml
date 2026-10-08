@@ -17,7 +17,7 @@ Item {
   readonly property string homeDir: Quickshell.env("HOME") || "/home/ac"
   readonly property string pluginPath: manifest && manifest.__sourceDir 
     ? manifest.__sourceDir 
-    : (homeDir + "/Work/projects/omarchy-snapshots")
+    : (homeDir + "/.config/omarchy/plugins/ac.snapshots")
   readonly property string coreScript: pluginPath + "/bin/omarchy-snapshots-core"
 
   // State data

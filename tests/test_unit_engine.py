@@ -141,14 +141,17 @@ class TestUnitEngine(unittest.TestCase):
             self.assertIn(f["status"], ["added", "modified", "deleted"])
 
     def test_live_status_safe_read(self):
-        # Querying live status on current system should not crash
+        # Querying live status on current system should not crash and should parse snapshots cleanly
         st = core.get_live_status()
         self.assertIn("ok", st)
         self.assertIn("health", st)
         self.assertIn("storage", st)
         self.assertIn("configs", st)
-        # Verify limine sync check detected our system's live service
         self.assertTrue(st["health"]["limineSyncActive"])
+        self.assertTrue(st["readable"])
+        self.assertGreater(len(st["configs"]), 0)
+        self.assertTrue(st["configs"][0]["readable"])
+        self.assertGreater(len(st["configs"][0]["snapshots"]), 0)
 
 if __name__ == "__main__":
     unittest.main()

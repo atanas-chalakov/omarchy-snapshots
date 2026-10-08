@@ -122,5 +122,32 @@ class TestQmlAndManifest(unittest.TestCase):
             header = f.read(8)
         self.assertEqual(header, b"\x89PNG\r\n\x1a\n", "preview.png must have valid PNG magic bytes")
 
+    def test_installer_scripts(self):
+        inst = os.path.join(PROJECT_ROOT, "install.sh")
+        uninst = os.path.join(PROJECT_ROOT, "uninstall.sh")
+        self.assertTrue(os.path.isfile(inst) and os.access(inst, os.X_OK), "install.sh must exist and be executable")
+        self.assertTrue(os.path.isfile(uninst) and os.access(uninst, os.X_OK), "uninstall.sh must exist and be executable")
+
+    def test_desktop_entry(self):
+        desktop_path = os.path.join(PROJECT_ROOT, "omarchy-snapshots.desktop")
+        self.assertTrue(os.path.isfile(desktop_path), "omarchy-snapshots.desktop must exist")
+        with open(desktop_path, "r", encoding="utf-8") as f:
+            content = f.read()
+        self.assertIn("Type=Application", content)
+        self.assertIn("Exec=omarchy-snapshots gui", content)
+        self.assertIn("Actions=Create;Diff;Mock;", content)
+
+    def test_arch_packaging(self):
+        pkgbuild = os.path.join(PROJECT_ROOT, "packaging", "PKGBUILD")
+        srcinfo = os.path.join(PROJECT_ROOT, "packaging", ".SRCINFO")
+        install_hook = os.path.join(PROJECT_ROOT, "packaging", "omarchy-snapshots.install")
+        self.assertTrue(os.path.isfile(pkgbuild), "packaging/PKGBUILD must exist")
+        self.assertTrue(os.path.isfile(srcinfo), "packaging/.SRCINFO must exist")
+        self.assertTrue(os.path.isfile(install_hook), "packaging/omarchy-snapshots.install must exist")
+        with open(pkgbuild, "r", encoding="utf-8") as f:
+            self.assertIn("pkgname=omarchy-snapshots", f.read())
+        with open(srcinfo, "r", encoding="utf-8") as f:
+            self.assertIn("pkgname = omarchy-snapshots", f.read())
+
 if __name__ == "__main__":
     unittest.main()

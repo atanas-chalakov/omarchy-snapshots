@@ -1,0 +1,20 @@
+pkgbase = omarchy-snapshots
+	pkgdesc = Visual Btrfs & Snapper snapshot manager, diff inspector, and recovery HUD for Omarchy
+	pkgver = 1.0.0
+	pkgrel = 1
+	url = https://github.com/atanas-chalakov/omarchy-snapshots
+	install = omarchy-snapshots.install
+	arch = any
+	license = MIT
+	depends = bash
+	depends = python
+	depends = quickshell
+	depends = omarchy-shell
+	depends = snapper
+	depends = btrfs-progs
+	optdepends = limine-snapper-sync: Automatic bootloader menu synchronization for snapshots
+	optdepends = polkit: Graphical authorization for privileged snapshot management
+	source = omarchy-snapshots-1.0.0.tar.gz::https://github.com/atanas-chalakov/omarchy-snapshots/archive/refs/tags/v1.0.0.tar.gz
+	sha256sums = SKIP
+
+pkgname = omarchy-snapshots

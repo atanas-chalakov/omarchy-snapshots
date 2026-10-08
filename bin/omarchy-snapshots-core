@@ -9,6 +9,7 @@ import sys
 import os
 import json
 import subprocess
+import shutil
 import argparse
 import time
 from datetime import datetime, timezone
@@ -268,8 +269,9 @@ def get_live_status():
                     if epoch > newest_epoch:
                         newest_epoch = epoch
 
-                    userdata = s.get("userdata", {})
-                    important = (userdata.get("important") == "yes") or (s.get("cleanup") == "none")
+                    userdata = s.get("userdata") or {}
+                    cleanup_str = s.get("cleanup") or "number"
+                    important = (userdata.get("important") == "yes") or (cleanup_str == "none")
 
                     snapshots.append({
                         "id": snap_id,
@@ -278,7 +280,7 @@ def get_live_status():
                         "date": date_str,
                         "epoch": epoch,
                         "relativeAge": format_relative_time(epoch),
-                        "cleanup": s.get("cleanup", "number"),
+                        "cleanup": cleanup_str,
                         "important": important,
                         "bootable": True, # On Omarchy, all root snapshots sync to Limine
                         "userdata": userdata
@@ -399,8 +401,12 @@ def restore_snapshot(snap_id, config="root", mock=False):
     # Execute restore
     if os.path.exists("/usr/bin/limine-snapper-restore"):
         if os.environ.get("WAYLAND_DISPLAY") or os.environ.get("DISPLAY"):
-            launcher = "/home/ac/Work/omarchy/bin/omarchy-launch-tui"
-            if os.path.exists(launcher):
+            launcher = shutil.which("omarchy-launch-tui")
+            if not launcher and os.environ.get("OMARCHY_PATH"):
+                cand = os.path.join(os.environ["OMARCHY_PATH"], "bin", "omarchy-launch-tui")
+                if os.path.exists(cand):
+                    launcher = cand
+            if launcher:
                 cmd = [launcher, "--title=Snapshot Recovery", "sudo", "limine-snapper-restore"]
                 subprocess.Popen(cmd)
                 return {

@@ -125,5 +125,15 @@ class TestCliCommands(unittest.TestCase):
         res = self.run_cmd(CLI_BIN, ["nonexistent_action"])
         self.assertNotEqual(res.returncode, 0)
 
+    def test_cli_gui_mock(self):
+        res = self.run_cmd(CLI_BIN, ["gui", "--mock"])
+        self.assertEqual(res.returncode, 0)
+        subprocess.run(["omarchy-shell", "-q", "shell", "hide", "ac.snapshots"])
+
+    def test_cli_gui_action_mock(self):
+        res = self.run_cmd(CLI_BIN, ["gui", "--action", "create", "--mock"])
+        self.assertEqual(res.returncode, 0)
+        subprocess.run(["omarchy-shell", "-q", "shell", "hide", "ac.snapshots"])
+
 if __name__ == "__main__":
     unittest.main()
