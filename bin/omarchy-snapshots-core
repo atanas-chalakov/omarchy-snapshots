@@ -700,6 +700,68 @@ def get_diff(snap_id, config="root", mock=False):
         "packages": matched_pkgs
     }
 
+def restore_file(snap_id, file_path, config="root", mock=False):
+    """
+    Restores an individual file from a specified snapshot to the live filesystem.
+    Guarantees safety by automatically creating a timestamped .bak backup of the current
+    file before overwriting or removing.
+    """
+    if not file_path:
+        return {"ok": False, "error": "file_path is required"}
+
+    clean_path = os.path.normpath(file_path.strip())
+    if not clean_path.startswith("/"):
+        clean_path = "/" + clean_path
+
+    timestamp = int(time.time())
+    backup_path = f"{clean_path}.bak.{timestamp}"
+
+    if mock:
+        return {
+            "ok": True,
+            "snapshotId": snap_id,
+            "filePath": clean_path,
+            "backupPath": backup_path,
+            "message": f"Successfully restored {clean_path} from snapshot #{snap_id}. Safety backup created at {backup_path}."
+        }
+
+    snapshot_dir = f"/.snapshots/{snap_id}/snapshot"
+    if not os.path.isdir(snapshot_dir):
+        return {"ok": False, "error": f"Snapshot #{snap_id} directory not found: {snapshot_dir}"}
+
+    source_path = os.path.normpath(f"{snapshot_dir}{clean_path}")
+    source_exists = os.path.exists(source_path) or os.path.islink(source_path)
+    target_exists = os.path.exists(clean_path) or os.path.islink(clean_path)
+
+    if not source_exists and not target_exists:
+        return {"ok": False, "error": f"File {clean_path} does not exist in snapshot #{snap_id} or in live filesystem."}
+
+    commands = []
+    if target_exists:
+        commands.append(f"cp -a '{clean_path}' '{backup_path}'")
+
+    if source_exists:
+        target_dir = os.path.dirname(clean_path)
+        commands.append(f"mkdir -p '{target_dir}'")
+        commands.append(f"cp -a '{source_path}' '{clean_path}'")
+    else:
+        # File was created in live system after snapshot was taken
+        commands.append(f"rm -rf '{clean_path}'")
+
+    shell_cmd = " && ".join(commands)
+    rc, out, err = run_privileged(["sh", "-c", shell_cmd])
+
+    if rc != 0:
+        return {"ok": False, "error": err or f"Failed to restore {clean_path} from snapshot #{snap_id}."}
+
+    return {
+        "ok": True,
+        "snapshotId": snap_id,
+        "filePath": clean_path,
+        "backupPath": backup_path if target_exists else None,
+        "message": f"Successfully restored {clean_path} from snapshot #{snap_id}." + (f" Safety backup created at {backup_path}." if target_exists else "")
+    }
+
 def authorize_access(config="root"):
     """Grants the wheel group permissions in snapper config and /.snapshots permissions."""
     # 1. snapper set-config ALLOW_GROUPS="wheel"
@@ -716,11 +778,12 @@ def authorize_access(config="root"):
 
 def main():
     parser = argparse.ArgumentParser(description="Omarchy Snapshots Backend Core")
-    parser.add_argument("command", choices=["status", "create", "delete", "pin", "unpin", "diff", "authorize", "restore", "packages"], help="Action to execute")
+    parser.add_argument("command", choices=["status", "create", "delete", "pin", "unpin", "diff", "authorize", "restore", "packages", "restore-file"], help="Action to execute")
     parser.add_argument("--mock", action="store_true", help="Output mock data for testing or preview")
     parser.add_argument("--config", default="root", help="Snapper config name (default: root)")
     parser.add_argument("--desc", default="", help="Description for snapshot creation")
     parser.add_argument("--id", type=int, help="Snapshot ID for operations")
+    parser.add_argument("--path", default="", help="File path for single-file rollback")
     parser.add_argument("--important", action="store_true", help="Mark snapshot as important (pinned)")
 
     args = parser.parse_args()
@@ -786,6 +849,16 @@ def main():
             "packages": found.get("packages", [])
         }, indent=2))
         sys.exit(0)
+    elif args.command == "restore-file":
+        if args.id is None:
+            print(json.dumps({"ok": False, "error": "--id is required for restore-file"}))
+            sys.exit(1)
+        if not args.path:
+            print(json.dumps({"ok": False, "error": "--path is required for restore-file"}))
+            sys.exit(1)
+        res = restore_file(args.id, args.path, config=args.config, mock=args.mock)
+        print(json.dumps(res, indent=2))
+        sys.exit(0 if res.get("ok") else 1)
     elif args.command == "authorize":
         res = authorize_access(config=args.config)
         print(json.dumps(res, indent=2))

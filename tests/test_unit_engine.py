@@ -236,6 +236,24 @@ class TestUnitEngine(unittest.TestCase):
         self.assertIn("hyprland", s2["criticalPackages"])
         self.assertIn("1 upgraded", s2["packageSummary"])
 
+    def test_restore_file_mock(self):
+        res = core.restore_file(19, "/etc/hypr/hyprland.conf", mock=True)
+        self.assertTrue(res["ok"])
+        self.assertEqual(res["snapshotId"], 19)
+        self.assertEqual(res["filePath"], "/etc/hypr/hyprland.conf")
+        self.assertIn(".bak.", res["backupPath"])
+        self.assertIn("Successfully restored", res["message"])
+
+    def test_restore_file_empty_path(self):
+        res = core.restore_file(19, "", mock=True)
+        self.assertFalse(res["ok"])
+        self.assertIn("file_path is required", res["error"])
+
+    def test_restore_file_live_nonexistent(self):
+        res = core.restore_file(999999, "/nonexistent/test/file.conf", mock=False)
+        self.assertFalse(res["ok"])
+        self.assertIn("not found", res["error"].lower())
+
     def test_live_status_safe_read(self):
         # Querying live status on current system should not crash and should parse snapshots cleanly
         st = core.get_live_status()

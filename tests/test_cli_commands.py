@@ -104,11 +104,28 @@ class TestCliCommands(unittest.TestCase):
         self.assertIn("Kernel & Boot", res.stdout)
         self.assertIn("Desktop Shell", res.stdout)
 
+    def test_cli_restore_file_mock(self):
+        res = self.run_cmd(CLI_BIN, ["restore-file", "--id", "19", "--path", "/etc/hypr/hyprland.conf", "--mock"])
+        self.assertEqual(res.returncode, 0)
+        self.assertIn("Single-File Rollback Successful", res.stdout)
+        self.assertIn("Safety Bak:", res.stdout)
+        self.assertIn("/etc/hypr/hyprland.conf", res.stdout)
+
     # Error handling test cases
     def test_missing_id_diff(self):
         res = self.run_cmd(CLI_BIN, ["diff", "--mock"])
         self.assertNotEqual(res.returncode, 0)
         self.assertIn("--id is required", (res.stdout + res.stderr))
+
+    def test_missing_id_restore_file(self):
+        res = self.run_cmd(CLI_BIN, ["restore-file", "--path", "/etc/hypr/hyprland.conf", "--mock"])
+        self.assertNotEqual(res.returncode, 0)
+        self.assertIn("--id is required", (res.stdout + res.stderr))
+
+    def test_missing_path_restore_file(self):
+        res = self.run_cmd(CLI_BIN, ["restore-file", "--id", "19", "--mock"])
+        self.assertNotEqual(res.returncode, 0)
+        self.assertIn("--path is required", (res.stdout + res.stderr))
 
     def test_missing_id_packages(self):
         res = self.run_cmd(CLI_BIN, ["packages", "--mock"])

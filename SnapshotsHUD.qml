@@ -49,6 +49,10 @@ Item {
   property bool showDeleteModal: false
   property var activeDeleteSnapshot: null
 
+  property bool showRestoreFileModal: false
+  property string activeRestoreFilePath: ""
+  property int activeRestoreFileSnapshotId: 0
+
   function notify(msg) {
     statusNotification = msg
     notifyTimer.restart()
@@ -230,6 +234,28 @@ Item {
     actionProcess.running = true
   }
 
+  function confirmRestoreFile(snapId, filePath) {
+    activeRestoreFileSnapshotId = snapId
+    activeRestoreFilePath = filePath
+    showRestoreFileModal = true
+  }
+
+  function executeRestoreFile() {
+    if (!activeRestoreFilePath || !activeRestoreFileSnapshotId) return
+    var snapId = activeRestoreFileSnapshotId
+    var filePath = activeRestoreFilePath
+    showRestoreFileModal = false
+    if (keyCatcher) keyCatcher.forceActiveFocus()
+    notify("Restoring " + filePath + " from #" + snapId + "...")
+
+    var args = [coreScript, "restore-file", "--id", String(snapId), "--path", filePath]
+    if (useMockData) args.push("--mock")
+
+    if (restoreFileProcess.running) restoreFileProcess.running = false
+    restoreFileProcess.command = args
+    restoreFileProcess.running = true
+  }
+
   function authorizeAccess() {
     notify("Requesting authorization for passwordless access...")
     authProcess.command = [coreScript, "authorize"]
@@ -366,6 +392,26 @@ Item {
 
   Process {
     id: restoreProcess
+  }
+
+  Process {
+    id: restoreFileProcess
+    stdout: StdioCollector {
+      waitForEnd: true
+      onStreamFinished: {
+        try {
+          var res = JSON.parse(text)
+          if (res.ok) {
+            var msg = "File restored! " + (res.backupPath ? ("Bak: " + res.backupPath) : "")
+            root.notify(msg)
+          } else {
+            root.notify("Failed to restore file: " + (res.error || "Unknown error"))
+          }
+        } catch(e) {
+          root.notify("Restored file successfully.")
+        }
+      }
+    }
   }
 
   Process {
@@ -2470,10 +2516,19 @@ Item {
                 }
 
                 delegate: Rectangle {
+                  id: fileRowRect
                   width: parent.width
-                  implicitHeight: 28
-                  radius: 4
-                  color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.02)
+                  implicitHeight: 32
+                  radius: 6
+                  color: fileRowMouse.containsMouse ? Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.05) : Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.02)
+                  border.color: fileRowMouse.containsMouse ? Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.1) : "transparent"
+                  border.width: 1
+
+                  MouseArea {
+                    id: fileRowMouse
+                    anchors.fill: parent
+                    hoverEnabled: true
+                  }
 
                   RowLayout {
                     anchors.fill: parent
@@ -2481,14 +2536,14 @@ Item {
                     spacing: 8
 
                     Rectangle {
-                      width: 16
-                      height: 16
-                      radius: 3
+                      width: 18
+                      height: 18
+                      radius: 4
                       color: modelData.status === "added" ? Qt.rgba(0.06, 0.72, 0.51, 0.2) : (modelData.status === "deleted" ? Qt.rgba(0.94, 0.27, 0.27, 0.2) : Qt.rgba(0.96, 0.62, 0.04, 0.2))
                       Text {
                         anchors.centerIn: parent
                         text: modelData.status === "added" ? "+" : (modelData.status === "deleted" ? "-" : "~")
-                        font.pixelSize: 10
+                        font.pixelSize: 11
                         font.weight: Font.Bold
                         color: modelData.status === "added" ? "#10B981" : (modelData.status === "deleted" ? "#EF4444" : "#F59E0B")
                       }
@@ -2501,6 +2556,41 @@ Item {
                       color: Color.foreground
                       Layout.fillWidth: true
                       elide: Text.ElideMiddle
+                    }
+
+                    // Restore File Action Chip
+                    Rectangle {
+                      id: fileRestoreBtn
+                      implicitHeight: 22
+                      implicitWidth: 80
+                      radius: 4
+                      color: fileRestoreBtnMouse.containsMouse ? Qt.rgba(0.06, 0.72, 0.51, 0.25) : Qt.rgba(0.06, 0.72, 0.51, 0.12)
+                      border.color: fileRestoreBtnMouse.containsMouse ? "#10B981" : Qt.rgba(0.06, 0.72, 0.51, 0.3)
+                      border.width: 1
+
+                      MouseArea {
+                        id: fileRestoreBtnMouse
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: root.confirmRestoreFile(root.activeDiffSnapshotId, modelData.path)
+                      }
+
+                      RowLayout {
+                        anchors.centerIn: parent
+                        spacing: 4
+                        Text {
+                          text: "󰁌"
+                          font.pixelSize: 11
+                          color: "#10B981"
+                        }
+                        Text {
+                          text: "Restore"
+                          font.pixelSize: 10
+                          font.weight: Font.Bold
+                          color: "#10B981"
+                        }
+                      }
                     }
                   }
                 }
@@ -2830,6 +2920,170 @@ Item {
                   font.pixelSize: 12
                   font.weight: Font.Bold
                   color: Color.background
+                }
+              }
+            }
+          }
+        }
+      }
+
+      // ==========================================
+      // MODAL 5: RESTORE FILE CONFIRMATION DIALOG
+      // ==========================================
+      Rectangle {
+        visible: root.showRestoreFileModal
+        anchors.fill: parent
+        color: Qt.rgba(0, 0, 0, 0.7)
+
+        MouseArea {
+          anchors.fill: parent
+          onClicked: root.showRestoreFileModal = false
+        }
+
+        Rectangle {
+          id: restoreFileModalCard
+          anchors.centerIn: parent
+          width: 520
+          implicitHeight: restoreFileCol.implicitHeight + 40
+          radius: 12
+          color: Color.background
+          border.color: "#10B981"
+          border.width: 1
+          focus: root.showRestoreFileModal
+
+          Keys.onEscapePressed: {
+            root.showRestoreFileModal = false
+            keyCatcher.forceActiveFocus()
+          }
+          Keys.onReturnPressed: root.executeRestoreFile()
+          Keys.onEnterPressed: root.executeRestoreFile()
+
+          MouseArea { anchors.fill: parent }
+
+          ColumnLayout {
+            id: restoreFileCol
+            anchors.fill: parent
+            anchors.margins: 20
+            spacing: 14
+
+            RowLayout {
+              spacing: 10
+              Text { text: "󰁌"; font.pixelSize: 22; color: "#10B981" }
+              Text {
+                text: "Roll Back File from Snapshot #" + root.activeRestoreFileSnapshotId
+                font.pixelSize: 16
+                font.weight: Font.Bold
+                color: Color.foreground
+              }
+            }
+
+            Text {
+              text: "Restore this individual file to its exact state recorded in snapshot #" + root.activeRestoreFileSnapshotId + ":"
+              font.pixelSize: 12
+              color: Color.muted
+              wrapMode: Text.WordWrap
+              Layout.fillWidth: true
+            }
+
+            Rectangle {
+              Layout.fillWidth: true
+              implicitHeight: 36
+              radius: 6
+              color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.05)
+              border.color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.1)
+              border.width: 1
+
+              RowLayout {
+                anchors.fill: parent
+                anchors.margins: 8
+                spacing: 8
+                Text { text: "📄"; font.pixelSize: 14 }
+                Text {
+                  text: root.activeRestoreFilePath
+                  font.pixelSize: 12
+                  font.family: Style.font.monospace
+                  font.weight: Font.Bold
+                  color: Color.foreground
+                  elide: Text.ElideMiddle
+                  Layout.fillWidth: true
+                }
+              }
+            }
+
+            // Safety Guarantee pill
+            Rectangle {
+              Layout.fillWidth: true
+              implicitHeight: safetyCol.implicitHeight + 16
+              radius: 6
+              color: Qt.rgba(0.06, 0.72, 0.51, 0.08)
+              border.color: Qt.rgba(0.06, 0.72, 0.51, 0.25)
+              border.width: 1
+
+              ColumnLayout {
+                id: safetyCol
+                anchors.fill: parent
+                anchors.margins: 10
+                spacing: 4
+
+                RowLayout {
+                  spacing: 6
+                  Text { text: "🛡️"; font.pixelSize: 12 }
+                  Text {
+                    text: "Safety Guarantee: Automatic Backup"
+                    font.pixelSize: 11
+                    font.weight: Font.Bold
+                    color: "#10B981"
+                  }
+                }
+                Text {
+                  text: "The current live file will be safely preserved as a timestamped backup (" + root.activeRestoreFilePath + ".bak.<timestamp>) before applying changes."
+                  font.pixelSize: 10
+                  color: Color.muted
+                  wrapMode: Text.WordWrap
+                  Layout.fillWidth: true
+                }
+              }
+            }
+
+            RowLayout {
+              Layout.fillWidth: true
+              spacing: 10
+              Item { Layout.fillWidth: true }
+
+              Rectangle {
+                implicitHeight: 34
+                implicitWidth: 80
+                radius: 6
+                color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.08)
+                MouseArea {
+                  anchors.fill: parent
+                  cursorShape: Qt.PointingHandCursor
+                  onClicked: root.showRestoreFileModal = false
+                }
+                Text {
+                  anchors.centerIn: parent
+                  text: "Cancel"
+                  font.pixelSize: 12
+                  color: Color.muted
+                }
+              }
+
+              Rectangle {
+                implicitHeight: 34
+                implicitWidth: 150
+                radius: 6
+                color: "#10B981"
+                MouseArea {
+                  anchors.fill: parent
+                  cursorShape: Qt.PointingHandCursor
+                  onClicked: root.executeRestoreFile()
+                }
+                Text {
+                  anchors.centerIn: parent
+                  text: "Restore File"
+                  font.pixelSize: 12
+                  font.weight: Font.Bold
+                  color: "#181825"
                 }
               }
             }

@@ -62,10 +62,11 @@ def print_table(data):
 
 def main():
     parser = argparse.ArgumentParser(description="Omarchy Snapshots CLI")
-    parser.add_argument("command", nargs="?", default="list", choices=["list", "create", "delete", "pin", "unpin", "diff", "authorize", "json", "gui", "toggle", "open", "show", "restore", "packages"], help="Command to run")
+    parser.add_argument("command", nargs="?", default="list", choices=["list", "create", "delete", "pin", "unpin", "diff", "authorize", "json", "gui", "toggle", "open", "show", "restore", "packages", "restore-file"], help="Command to run")
     parser.add_argument("--action", choices=["create", "diff", "restore"], help="Initial action for HUD")
     parser.add_argument("--desc", default="", help="Description for new snapshot")
     parser.add_argument("--id", type=int, help="Snapshot ID")
+    parser.add_argument("--path", default="", help="File path for single-file rollback")
     parser.add_argument("--important", action="store_true", help="Pin snapshot against auto-cleanup")
     parser.add_argument("--mock", action="store_true", help="Use mock data")
 
@@ -206,6 +207,28 @@ def main():
             cat_col = "\033[1;33m" if p.get("isCritical") else "\033[0m"
             print(f"│ {act_col}{act:<12}\033[0m │ {name:<27} │ {cat_col}{cat:<17}\033[0m │ {ver:<44} │")
         print("└──────────────┴─────────────────────────────┴───────────────────┴──────────────────────────────────────────────┘\n")
+    elif args.command == "restore-file":
+        if args.id is None:
+            print("\033[1;31mError:\033[0m --id is required for restore-file command.")
+            sys.exit(1)
+        if not args.path:
+            print("\033[1;31mError:\033[0m --path is required for restore-file command.")
+            sys.exit(1)
+        core_args = ["restore-file", "--id", str(args.id), "--path", args.path]
+        if args.mock:
+            core_args.append("--mock")
+        res = run_core(core_args)
+        if res.get("ok"):
+            print(f"\n\033[1;32m✔ Single-File Rollback Successful!\033[0m")
+            print(f"  \033[1mSnapshot:\033[0m    #{args.id}")
+            print(f"  \033[1mTarget:\033[0m      {res.get('filePath')}")
+            if res.get("backupPath"):
+                print(f"  \033[1;36mSafety Bak:\033[0m  {res.get('backupPath')}")
+            print()
+            sys.exit(0)
+        else:
+            print(f"\033[1;31m✗\033[0m {res.get('error', 'Single-file rollback failed.')}")
+            sys.exit(1)
     elif args.command == "authorize":
         res = run_core(["authorize"])
         if res.get("ok"):

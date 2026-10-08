@@ -129,6 +129,27 @@ class TestQmlAndManifest(unittest.TestCase):
         self.assertIn("packageSummary", content)
         self.assertIn("criticalCategory", content)
 
+    def test_restore_file_ui(self):
+        hud_path = os.path.join(PROJECT_ROOT, "SnapshotsHUD.qml")
+        with open(hud_path, "r", encoding="utf-8") as f:
+            content = f.read()
+
+        # Restore file properties and functions
+        self.assertIn("property bool showRestoreFileModal", content)
+        self.assertIn("property string activeRestoreFilePath", content)
+        self.assertIn("function confirmRestoreFile(", content)
+        self.assertIn("function executeRestoreFile()", content)
+        self.assertIn("restoreFileProcess", content)
+
+        # Restore file button chip in file list
+        self.assertIn("fileRestoreBtn", content)
+        self.assertIn("confirmRestoreFile", content)
+
+        # Restore file modal dialog
+        self.assertIn("restoreFileModalCard", content)
+        self.assertIn("Roll Back File from Snapshot", content)
+        self.assertIn("Safety Guarantee: Automatic Backup", content)
+
     def test_keyboard_navigation_support(self):
         hud_path = os.path.join(PROJECT_ROOT, "SnapshotsHUD.qml")
         with open(hud_path, "r", encoding="utf-8") as f:

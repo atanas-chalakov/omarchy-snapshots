@@ -117,6 +117,25 @@ class TestSnapshotsCore(unittest.TestCase):
         self.assertNotEqual(res.returncode, 0)
         self.assertIn("--id is required", (res.stdout + res.stderr))
 
+    def test_mock_restore_file(self):
+        res = self.run_core(["restore-file", "--id", "19", "--path", "/etc/hypr/hyprland.conf", "--mock"])
+        self.assertTrue(res.get("ok"))
+        self.assertEqual(res.get("snapshotId"), 19)
+        self.assertEqual(res.get("filePath"), "/etc/hypr/hyprland.conf")
+        self.assertIn(".bak.", res.get("backupPath", ""))
+
+    def test_mock_restore_file_missing_id(self):
+        cmd = [CORE_BIN, "restore-file", "--path", "/etc/hypr/hyprland.conf", "--mock"]
+        res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        self.assertNotEqual(res.returncode, 0)
+        self.assertIn("--id is required", (res.stdout + res.stderr))
+
+    def test_mock_restore_file_missing_path(self):
+        cmd = [CORE_BIN, "restore-file", "--id", "19", "--mock"]
+        res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        self.assertNotEqual(res.returncode, 0)
+        self.assertIn("--path is required", (res.stdout + res.stderr))
+
     def test_user_cli_list(self):
         res = subprocess.run([CLI_BIN, "list", "--mock"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
         self.assertEqual(res.returncode, 0)
