@@ -286,5 +286,15 @@ class TestQmlAndManifest(unittest.TestCase):
         with open(srcinfo, "r", encoding="utf-8") as f:
             self.assertIn("pkgname = omarchy-snapshots", f.read())
 
+    def test_demo_data_interactive_state(self):
+        hud_path = os.path.join(PROJECT_ROOT, "SnapshotsHUD.qml")
+        with open(hud_path, "r", encoding="utf-8") as f:
+            content = f.read()
+
+        self.assertIn("property var mockSnapshotsList: null", content)
+        self.assertIn("onUseMockDataChanged", content)
+        self.assertIn("mockSnapshotsList = [newSnap].concat(mockSnapshotsList)", content)
+        self.assertIn("root.mockSnapshotsList.slice()", content)
+
 if __name__ == "__main__":
     unittest.main()

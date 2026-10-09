@@ -1216,6 +1216,17 @@ def main():
                         found = s
                         break
         if not found:
+            if args.mock and args.id >= 20:
+                print(json.dumps({
+                    "ok": True,
+                    "snapshotId": args.id,
+                    "packageCount": 0,
+                    "hasCriticalPackages": False,
+                    "criticalPackages": [],
+                    "packageSummary": "No package changes",
+                    "packages": []
+                }, indent=2))
+                sys.exit(0)
             print(json.dumps({"ok": False, "error": f"Snapshot #{args.id} not found."}))
             sys.exit(1)
         print(json.dumps({

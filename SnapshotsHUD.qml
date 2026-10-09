@@ -24,6 +24,7 @@ Item {
   property var statusData: ({})
   property var snapshotsList: []
   property var filteredSnapshots: []
+  property var mockSnapshotsList: null
   property int selectedIndex: 0
   readonly property var selectedSnapshot: (selectedIndex >= 0 && selectedIndex < filteredSnapshots.length)
     ? filteredSnapshots[selectedIndex]
@@ -147,6 +148,10 @@ Item {
   onCurrentFilterChanged: applyFilter()
   onSearchQueryChanged: applyFilter()
   onSnapshotsListChanged: applyFilter()
+  onUseMockDataChanged: {
+    root.mockSnapshotsList = null
+    root.refresh()
+  }
 
   function openCreateModal(initialDesc) {
     newSnapshotDesc = initialDesc || ""
@@ -165,11 +170,54 @@ Item {
       desc = "Manual checkpoint " + Qt.formatDateTime(new Date(), "yyyy-MM-dd hh:mm")
     }
     showCreateModal = false
+
+    if (useMockData) {
+      if (!mockSnapshotsList) {
+        mockSnapshotsList = (snapshotsList || []).slice()
+      }
+      var maxId = 19
+      for (var i = 0; i < mockSnapshotsList.length; i++) {
+        if (mockSnapshotsList[i].id && mockSnapshotsList[i].id > maxId) {
+          maxId = mockSnapshotsList[i].id
+        }
+      }
+      var nextId = maxId + 1
+      var now = new Date()
+      var newSnap = {
+        "id": nextId,
+        "type": "single",
+        "description": desc,
+        "date": Qt.formatDateTime(now, "yyyy-MM-dd hh:mm:ss"),
+        "epoch": Math.floor(now.getTime() / 1000),
+        "relativeAge": "just now",
+        "cleanup": newSnapshotImportant ? "none" : "number",
+        "important": newSnapshotImportant,
+        "bootable": true,
+        "bootableInLimine": true,
+        "packageCount": 0,
+        "hasCriticalPackages": false,
+        "criticalPackages": [],
+        "packageSummary": "Manual checkpoint",
+        "packages": [],
+        "userdata": { "description": desc }
+      }
+      mockSnapshotsList = [newSnap].concat(mockSnapshotsList)
+      snapshotsList = mockSnapshotsList.slice()
+      if (statusData && statusData.storage) {
+        var copyStatus = JSON.parse(JSON.stringify(statusData))
+        copyStatus.storage.snapshotCount = mockSnapshotsList.length
+        statusData = copyStatus
+      }
+      applyFilter()
+      selectedIndex = 0
+      notify("Snapshot #" + nextId + " ('" + desc + "') created successfully.")
+      return
+    }
+
     notify("Creating checkpoint '" + desc + "'...")
 
     var args = [coreScript, "create", "--desc", desc]
     if (newSnapshotImportant) args.push("--important")
-    if (useMockData) args.push("--mock")
 
     if (actionProcess.running) actionProcess.running = false
     actionProcess.command = args
@@ -177,10 +225,31 @@ Item {
   }
 
   function togglePin(snapId, currentImportant) {
+    if (useMockData) {
+      if (!mockSnapshotsList) {
+        mockSnapshotsList = (snapshotsList || []).slice()
+      }
+      var found = false
+      var newImportant = !currentImportant
+      for (var i = 0; i < mockSnapshotsList.length; i++) {
+        if (mockSnapshotsList[i].id === snapId) {
+          mockSnapshotsList[i].important = newImportant
+          mockSnapshotsList[i].cleanup = newImportant ? "none" : "number"
+          found = true
+          break
+        }
+      }
+      if (found) {
+        snapshotsList = mockSnapshotsList.slice()
+        applyFilter()
+        notify((newImportant ? "Pinned" : "Unpinned") + " snapshot #" + snapId + ".")
+      }
+      return
+    }
+
     var action = currentImportant ? "unpin" : "pin"
     notify((currentImportant ? "Unpinning" : "Pinning") + " snapshot #" + snapId + "...")
     var args = [coreScript, action, "--id", String(snapId)]
-    if (useMockData) args.push("--mock")
     if (actionProcess.running) actionProcess.running = false
     actionProcess.command = args
     actionProcess.running = true
@@ -200,6 +269,10 @@ Item {
   }
 
   function browseSnapshot(snapId) {
+    if (useMockData) {
+      notify("Demo: Snapshot #" + snapId + " browse simulated (path: /.snapshots/" + snapId + "/snapshot)")
+      return
+    }
     var path = "/.snapshots/" + snapId + "/snapshot"
     notify("Opening " + path + " in file browser...")
     browseProcess.command = ["xdg-open", path]
@@ -216,9 +289,14 @@ Item {
     var id = activeRestoreSnapshot.id
     showRestoreModal = false
     if (keyCatcher) keyCatcher.forceActiveFocus()
+
+    if (useMockData) {
+      notify("Recovery preview: System roll-back to snapshot #" + id + " staged successfully.")
+      return
+    }
+
     notify("Launching recovery for snapshot #" + id + "...")
     var args = [coreScript, "restore", "--id", String(id)]
-    if (useMockData) args.push("--mock")
 
     if (actionProcess.running) actionProcess.running = false
     actionProcess.command = args
@@ -235,9 +313,31 @@ Item {
     var id = activeDeleteSnapshot.id
     showDeleteModal = false
     if (keyCatcher) keyCatcher.forceActiveFocus()
+
+    if (useMockData) {
+      if (!mockSnapshotsList) {
+        mockSnapshotsList = (snapshotsList || []).slice()
+      }
+      var filtered = []
+      for (var i = 0; i < mockSnapshotsList.length; i++) {
+        if (mockSnapshotsList[i].id !== id) {
+          filtered.push(mockSnapshotsList[i])
+        }
+      }
+      mockSnapshotsList = filtered
+      snapshotsList = mockSnapshotsList.slice()
+      if (statusData && statusData.storage) {
+        var copyStatus = JSON.parse(JSON.stringify(statusData))
+        copyStatus.storage.snapshotCount = mockSnapshotsList.length
+        statusData = copyStatus
+      }
+      applyFilter()
+      notify("Snapshot #" + id + " deleted successfully.")
+      return
+    }
+
     notify("Pruning snapshot #" + id + "...")
     var args = [coreScript, "delete", "--id", String(id)]
-    if (useMockData) args.push("--mock")
     actionProcess.command = args
     actionProcess.running = true
   }
@@ -254,10 +354,15 @@ Item {
     var filePath = activeRestoreFilePath
     showRestoreFileModal = false
     if (keyCatcher) keyCatcher.forceActiveFocus()
+
+    if (useMockData) {
+      notify("File " + filePath + " safely restored from snapshot #" + snapId + ".")
+      return
+    }
+
     notify("Restoring " + filePath + " from #" + snapId + "...")
 
     var args = [coreScript, "restore-file", "--id", String(snapId), "--path", filePath]
-    if (useMockData) args.push("--mock")
 
     if (restoreFileProcess.running) restoreFileProcess.running = false
     restoreFileProcess.command = args
@@ -277,8 +382,31 @@ Item {
   function executeOptimize() {
     isOptimizing = true
     notify("Safely pruning stale snapshots and reclaiming space...")
+
+    if (useMockData) {
+      if (!mockSnapshotsList) {
+        mockSnapshotsList = (snapshotsList || []).slice()
+      }
+      var remaining = []
+      for (var i = 0; i < mockSnapshotsList.length; i++) {
+        if (mockSnapshotsList[i].id === 16) continue
+        remaining.push(mockSnapshotsList[i])
+      }
+      mockSnapshotsList = remaining
+      snapshotsList = mockSnapshotsList.slice()
+      if (statusData && statusData.storage) {
+        var copyStatus = JSON.parse(JSON.stringify(statusData))
+        copyStatus.storage.snapshotCount = mockSnapshotsList.length
+        statusData = copyStatus
+      }
+      applyFilter()
+      isOptimizing = false
+      showOptimizeModal = false
+      notify("Optimization complete: Reclaimed ~1.4 GiB storage.")
+      return
+    }
+
     var args = [coreScript, "optimize", "--execute"]
-    if (useMockData) args.push("--mock")
     if (executeOptimizeProcess.running) executeOptimizeProcess.running = false
     executeOptimizeProcess.command = args
     executeOptimizeProcess.running = true
@@ -377,7 +505,18 @@ Item {
               }
             }
           }
-          root.snapshotsList = snaps
+          if (root.useMockData) {
+            if (root.mockSnapshotsList === null) {
+              root.mockSnapshotsList = snaps.slice()
+            }
+            root.snapshotsList = root.mockSnapshotsList.slice()
+            if (root.statusData && root.statusData.storage) {
+              root.statusData.storage.snapshotCount = root.mockSnapshotsList.length
+            }
+          } else {
+            root.mockSnapshotsList = null
+            root.snapshotsList = snaps
+          }
         } catch(e) {
           console.warn("[omarchy-snapshots] Failed to parse status JSON:", e)
         }
@@ -962,10 +1101,7 @@ Item {
               MouseArea {
                 anchors.fill: parent
                 cursorShape: Qt.PointingHandCursor
-                onClicked: {
-                  root.useMockData = !root.useMockData
-                  root.refresh()
-                }
+                onClicked: root.useMockData = !root.useMockData
               }
 
               Text {
