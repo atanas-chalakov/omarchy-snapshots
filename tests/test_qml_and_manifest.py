@@ -296,5 +296,28 @@ class TestQmlAndManifest(unittest.TestCase):
         self.assertIn("mockSnapshotsList = [newSnap].concat(mockSnapshotsList)", content)
         self.assertIn("root.mockSnapshotsList.slice()", content)
 
+    def test_destructive_actions_safety_guards(self):
+        hud_path = os.path.join(PROJECT_ROOT, "SnapshotsHUD.qml")
+        with open(hud_path, "r", encoding="utf-8") as f:
+            content = f.read()
+
+        # Full system restore safety guards
+        self.assertIn("function confirmRestore(snapshot)", content)
+        self.assertIn("function executeRestore()", content)
+        self.assertIn("property bool showRestoreModal: false", content)
+        self.assertIn("if (!activeRestoreSnapshot) return", content)
+
+        # Snapshot delete safety guards
+        self.assertIn("function confirmDelete(snapshot)", content)
+        self.assertIn("function executeDelete()", content)
+        self.assertIn("property bool showDeleteModal: false", content)
+        self.assertIn("if (!activeDeleteSnapshot) return", content)
+
+        # File restore safety guards
+        self.assertIn("function confirmRestoreFile(", content)
+        self.assertIn("function executeRestoreFile()", content)
+        self.assertIn("property bool showRestoreFileModal: false", content)
+        self.assertIn("if (!activeRestoreFilePath || !activeRestoreFileSnapshotId) return", content)
+
 if __name__ == "__main__":
     unittest.main()

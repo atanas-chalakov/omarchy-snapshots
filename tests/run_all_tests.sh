@@ -47,6 +47,9 @@ run_suite "QML, Manifest & Static Asset Tests" "python3 -m unittest \"$PROJECT_R
 # 6. Live IPC and Desktop Lifecycle Tests
 run_suite "Live Desktop & IPC Integration Tests" "python3 -m unittest \"$PROJECT_ROOT/tests/test_ipc_integration.py\""
 
+# 7. Mission-Critical Safety, Rollback & Precision Tests
+run_suite "Mission-Critical Safety, Rollback & Precision Tests" "python3 -m unittest \"$PROJECT_ROOT/tests/test_safety_and_precision.py\""
+
 echo -e "${BLUE}============================================================${RESET}"
 if (( FAILURES == 0 )); then
   echo -e "${GREEN}★ ALL TEST SUITES PASSED SUCCESSFULLY! (0 failures)${RESET}"

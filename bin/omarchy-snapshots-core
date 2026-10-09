@@ -14,6 +14,7 @@ import shutil
 import argparse
 import time
 import glob
+import shlex
 from datetime import datetime, timezone
 
 def run_cmd(cmd, timeout=5):
@@ -755,12 +756,29 @@ def create_snapshot(description, config="root", important=False, mock=False):
         }
     return {"ok": False, "error": err or "Failed to create snapshot."}
 
+def validate_snap_id(snap_id):
+    """Validates snapshot ID is a positive non-zero integer."""
+    if snap_id is None:
+        return False, "Snapshot ID is required."
+    try:
+        sid = int(snap_id)
+        if sid <= 0:
+            return False, "Snapshot ID must be a positive integer."
+        return True, sid
+    except (ValueError, TypeError):
+        return False, f"Invalid snapshot ID: {snap_id}"
+
 def restore_snapshot(snap_id, config="root", mock=False):
     """
     Restore root filesystem to a specified snapshot.
     In mock mode: returns simulated success.
     In live mode: validates that snap_id exists, and invokes recovery.
     """
+    valid, val = validate_snap_id(snap_id)
+    if not valid:
+        return {"ok": False, "error": val}
+    snap_id = val
+
     if mock:
         return {
             "ok": True,
@@ -812,6 +830,11 @@ def restore_snapshot(snap_id, config="root", mock=False):
     return {"ok": False, "error": err or "Failed to initiate snapshot restore."}
 
 def delete_snapshot(snap_id, config="root", mock=False):
+    valid, val = validate_snap_id(snap_id)
+    if not valid:
+        return {"ok": False, "error": val}
+    snap_id = val
+
     if mock:
         return {"ok": True, "message": f"[Mock] Snapshot #{snap_id} deleted."}
 
@@ -825,14 +848,19 @@ def delete_snapshot(snap_id, config="root", mock=False):
     return {"ok": False, "error": err or f"Failed to delete snapshot #{snap_id}."}
 
 def pin_snapshot(snap_id, pin=True, config="root", mock=False):
+    valid, val = validate_snap_id(snap_id)
+    if not valid:
+        return {"ok": False, "error": val}
+    snap_id = val
+
     if mock:
         state = "pinned" if pin else "unpinned"
         return {"ok": True, "message": f"[Mock] Snapshot #{snap_id} {state}."}
 
     # Pinning in snapper is setting userdata important=yes and cleanup=none
-    val = "important=yes" if pin else "important="
+    val_prop = "important=yes" if pin else "important="
     cleanup_val = "none" if pin else "number"
-    cmd = ["snapper", "-c", config, "modify", "-c", cleanup_val, "-u", val, str(snap_id)]
+    cmd = ["snapper", "-c", config, "modify", "-c", cleanup_val, "-u", val_prop, str(snap_id)]
 
     rc, out, err = run_cmd(cmd)
     if rc != 0 and ("permission" in err.lower() or "must be root" in err.lower()):
@@ -844,6 +872,11 @@ def pin_snapshot(snap_id, pin=True, config="root", mock=False):
     return {"ok": False, "error": err or f"Failed to update snapshot #{snap_id}."}
 
 def get_diff(snap_id, config="root", mock=False):
+    valid, val = validate_snap_id(snap_id)
+    if not valid:
+        return {"ok": False, "error": val}
+    snap_id = val
+
     if mock:
         return {
             "ok": True,
@@ -931,16 +964,23 @@ def get_diff(snap_id, config="root", mock=False):
         "packages": matched_pkgs
     }
 
-def restore_file(snap_id, file_path, config="root", mock=False):
+def restore_file(snap_id, file_path, config="root", mock=False, snapshot_root="/.snapshots", live_root="/"):
     """
     Restores an individual file from a specified snapshot to the live filesystem.
     Guarantees safety by automatically creating a timestamped .bak backup of the current
     file before overwriting or removing.
     """
-    if not file_path:
+    valid, val = validate_snap_id(snap_id)
+    if not valid:
+        return {"ok": False, "error": val}
+    snap_id = val
+
+    if not file_path or not str(file_path).strip():
         return {"ok": False, "error": "file_path is required"}
 
-    clean_path = os.path.normpath(file_path.strip())
+    clean_path = os.path.normpath(str(file_path).strip())
+    if clean_path in ["/", "."]:
+        return {"ok": False, "error": "Cannot restore root directory as an individual file"}
     if not clean_path.startswith("/"):
         clean_path = "/" + clean_path
 
@@ -956,31 +996,37 @@ def restore_file(snap_id, file_path, config="root", mock=False):
             "message": f"Successfully restored {clean_path} from snapshot #{snap_id}. Safety backup created at {backup_path}."
         }
 
-    snapshot_dir = f"/.snapshots/{snap_id}/snapshot"
+    snapshot_dir = os.path.normpath(f"{snapshot_root}/{snap_id}/snapshot")
     if not os.path.isdir(snapshot_dir):
         return {"ok": False, "error": f"Snapshot #{snap_id} directory not found: {snapshot_dir}"}
 
-    source_path = os.path.normpath(f"{snapshot_dir}{clean_path}")
+    live_target = os.path.normpath(f"{live_root}/{clean_path.lstrip('/')}")
+    live_backup = f"{live_target}.bak.{timestamp}"
+
+    source_path = os.path.normpath(f"{snapshot_dir}/{clean_path.lstrip('/')}")
     source_exists = os.path.exists(source_path) or os.path.islink(source_path)
-    target_exists = os.path.exists(clean_path) or os.path.islink(clean_path)
+    target_exists = os.path.exists(live_target) or os.path.islink(live_target)
 
     if not source_exists and not target_exists:
         return {"ok": False, "error": f"File {clean_path} does not exist in snapshot #{snap_id} or in live filesystem."}
 
     commands = []
     if target_exists:
-        commands.append(f"cp -a '{clean_path}' '{backup_path}'")
+        commands.append(f"cp -a {shlex.quote(live_target)} {shlex.quote(live_backup)}")
 
     if source_exists:
-        target_dir = os.path.dirname(clean_path)
-        commands.append(f"mkdir -p '{target_dir}'")
-        commands.append(f"cp -a '{source_path}' '{clean_path}'")
+        target_dir = os.path.dirname(live_target)
+        commands.append(f"mkdir -p {shlex.quote(target_dir)}")
+        commands.append(f"cp -a {shlex.quote(source_path)} {shlex.quote(live_target)}")
     else:
         # File was created in live system after snapshot was taken
-        commands.append(f"rm -rf '{clean_path}'")
+        commands.append(f"rm -rf {shlex.quote(live_target)}")
 
     shell_cmd = " && ".join(commands)
-    rc, out, err = run_privileged(["sh", "-c", shell_cmd])
+    if live_root != "/" or os.geteuid() == 0:
+        rc, out, err = run_cmd(["sh", "-c", shell_cmd])
+    else:
+        rc, out, err = run_privileged(["sh", "-c", shell_cmd])
 
     if rc != 0:
         return {"ok": False, "error": err or f"Failed to restore {clean_path} from snapshot #{snap_id}."}

@@ -330,5 +330,20 @@ class TestUnitEngine(unittest.TestCase):
         self.assertIn("entries", lh)
         self.assertIn("healthStatus", lh)
 
+    def test_validate_snap_id(self):
+        valid, val = core.validate_snap_id(19)
+        self.assertTrue(valid)
+        self.assertEqual(val, 19)
+
+        valid_str, val_str = core.validate_snap_id("20")
+        self.assertTrue(valid_str)
+        self.assertEqual(val_str, 20)
+
+        # Invalid cases
+        self.assertFalse(core.validate_snap_id(-1)[0])
+        self.assertFalse(core.validate_snap_id(0)[0])
+        self.assertFalse(core.validate_snap_id("invalid")[0])
+        self.assertFalse(core.validate_snap_id(None)[0])
+
 if __name__ == "__main__":
     unittest.main()
