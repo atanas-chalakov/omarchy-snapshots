@@ -1659,23 +1659,30 @@ Item {
             spacing: 6
             Repeater {
               model: [
-                { id: "all", label: "All Points (" + root.snapshotsList.length + ")", key: "1" },
-                { id: "update", label: "Pre-Update", key: "2" },
-                { id: "manual", label: "Manual", key: "3" },
-                { id: "pinned", label: "Pinned 📌", key: "4" }
+                { id: "all", label: "All Points (" + root.snapshotsList.length + ")", icon: "", key: "1" },
+                { id: "update", label: "Pre-Update", icon: "󰚰", key: "2" },
+                { id: "manual", label: "Manual", icon: "󰐕", key: "3" },
+                { id: "pinned", label: "Pinned", icon: "󰤱", key: "4" }
               ]
 
               Rectangle {
+                id: filterChipRect
                 property bool selected: root.currentFilter === modelData.id
-                implicitHeight: 28
+                implicitHeight: 30
                 implicitWidth: chipRowLayout.implicitWidth + 20
-                radius: 14
-                color: selected ? Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.2) : Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.04)
-                border.color: selected ? Color.accent : Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.1)
+                radius: 8
+                color: selected 
+                  ? Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.22) 
+                  : (filterMouse.containsMouse ? Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.08) : Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.03))
+                border.color: selected 
+                  ? Color.accent 
+                  : (filterMouse.containsMouse ? Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.18) : Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.10))
                 border.width: 1
 
                 MouseArea {
+                  id: filterMouse
                   anchors.fill: parent
+                  hoverEnabled: true
                   cursorShape: Qt.PointingHandCursor
                   onClicked: {
                     root.currentFilter = modelData.id
@@ -1689,25 +1696,39 @@ Item {
                   spacing: 6
 
                   Text {
+                    visible: modelData.icon.length > 0
+                    text: modelData.icon
+                    font.pixelSize: 12
+                    color: modelData.id === "pinned" ? "#ffffff" : (filterChipRect.selected ? Color.accent : Color.muted)
+                  }
+
+                  Text {
                     id: chipText
                     text: modelData.label
                     font.pixelSize: 11
-                    font.weight: selected ? Font.Bold : Font.Normal
-                    color: selected ? Color.accent : Color.muted
+                    font.weight: filterChipRect.selected ? Font.DemiBold : Font.Normal
+                    color: filterChipRect.selected ? Color.accent : Color.muted
                   }
 
                   Rectangle {
                     implicitHeight: 16
-                    implicitWidth: chipKeyText.implicitWidth + 6
+                    implicitWidth: Math.max(16, chipKeyText.implicitWidth + 6)
                     radius: 3
-                    color: selected ? Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.35) : Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.08)
+                    color: filterChipRect.selected 
+                      ? Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.35) 
+                      : Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.08)
+                    border.color: filterChipRect.selected 
+                      ? Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.5) 
+                      : Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.15)
+                    border.width: 1
+
                     Text {
                       id: chipKeyText
                       anchors.centerIn: parent
                       text: modelData.key
                       font.pixelSize: 9
                       font.weight: Font.Bold
-                      color: selected ? Color.accent : Color.muted
+                      color: filterChipRect.selected ? Color.accent : Color.muted
                     }
                   }
                 }
@@ -1719,11 +1740,15 @@ Item {
 
           // Search Field
           Rectangle {
-            implicitHeight: 28
-            implicitWidth: 190
-            radius: 14
-            color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.04)
-            border.color: searchInput.activeFocus ? Color.accent : Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.1)
+            implicitHeight: 30
+            implicitWidth: 200
+            radius: 8
+            color: searchInput.activeFocus 
+              ? Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.06) 
+              : Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.03)
+            border.color: searchInput.activeFocus 
+              ? Color.accent 
+              : Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.12)
             border.width: 1
 
             RowLayout {
@@ -1734,13 +1759,15 @@ Item {
 
               Text {
                 text: ""
-                font.pixelSize: 11
-                color: Color.muted
+                font.pixelSize: 12
+                color: searchInput.activeFocus ? Color.accent : Color.muted
+                Layout.alignment: Qt.AlignVCenter
               }
 
               TextInput {
                 id: searchInput
                 Layout.fillWidth: true
+                Layout.alignment: Qt.AlignVCenter
                 font.pixelSize: 11
                 color: Color.foreground
                 clip: true
@@ -1764,16 +1791,21 @@ Item {
                   font.pixelSize: 11
                   color: Color.muted
                   visible: !parent.text && !parent.activeFocus
+                  verticalAlignment: Text.AlignVCenter
                 }
               }
 
               // Key hint [/] when input is inactive and empty
               Rectangle {
                 visible: searchInput.text.length === 0 && !searchInput.activeFocus
-                implicitHeight: 16
-                implicitWidth: searchKeyBadge.implicitWidth + 6
-                radius: 3
+                Layout.alignment: Qt.AlignVCenter
+                implicitHeight: 18
+                implicitWidth: Math.max(18, searchKeyBadge.implicitWidth + 8)
+                radius: 4
                 color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.08)
+                border.color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.16)
+                border.width: 1
+
                 Text {
                   id: searchKeyBadge
                   anchors.centerIn: parent
@@ -1784,18 +1816,30 @@ Item {
                 }
               }
 
-              Text {
+              Rectangle {
                 visible: searchInput.text.length > 0
-                text: "󰅖"
-                font.pixelSize: 11
-                color: Color.muted
+                Layout.alignment: Qt.AlignVCenter
+                width: 16
+                height: 16
+                radius: 8
+                color: clearSearchMouse.containsMouse ? Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.15) : "transparent"
+
                 MouseArea {
+                  id: clearSearchMouse
                   anchors.fill: parent
+                  hoverEnabled: true
                   cursorShape: Qt.PointingHandCursor
                   onClicked: {
                     searchInput.text = ""
                     keyCatcher.forceActiveFocus()
                   }
+                }
+
+                Text {
+                  anchors.centerIn: parent
+                  text: "󰅖"
+                  font.pixelSize: 10
+                  color: clearSearchMouse.containsMouse ? Color.foreground : Color.muted
                 }
               }
             }
@@ -1918,14 +1962,27 @@ Item {
                     Rectangle {
                       visible: modelData.important === true
                       implicitHeight: 18
-                      implicitWidth: 54
+                      implicitWidth: pinChipRow.implicitWidth + 12
                       radius: 9
-                      color: Qt.rgba(0.96, 0.62, 0.04, 0.2)
+                      color: Qt.rgba(0.96, 0.62, 0.15, 0.22)
+                      border.color: Qt.rgba(0.96, 0.62, 0.15, 0.40)
+                      border.width: 1
+
                       RowLayout {
+                        id: pinChipRow
                         anchors.centerIn: parent
-                        spacing: 2
-                        Text { text: "📌"; font.pixelSize: 9 }
-                        Text { text: "Pinned"; font.pixelSize: 9; font.weight: Font.Bold; color: "#F59E0B" }
+                        spacing: 4
+                        Text {
+                          text: "󰤱"
+                          font.pixelSize: 11
+                          color: "#ffffff"
+                        }
+                        Text {
+                          text: "Pinned"
+                          font.pixelSize: 9
+                          font.weight: Font.Bold
+                          color: "#ffffff"
+                        }
                       }
                     }
 
@@ -2125,22 +2182,24 @@ Item {
                       anchors.centerIn: parent
                       spacing: 4
                       Text {
-                        text: modelData.important ? "📌" : "󰤱"
-                        font.pixelSize: 11
-                        color: modelData.important ? "#F59E0B" : Color.muted
+                        text: modelData.important ? "󰤱" : "󰤲"
+                        font.pixelSize: 12
+                        color: modelData.important ? "#ffffff" : Color.muted
                       }
                       Rectangle {
                         implicitHeight: 15
                         implicitWidth: pinKeyTxt.implicitWidth + 6
                         radius: 3
-                        color: Qt.rgba(0.96, 0.62, 0.04, 0.2)
+                        color: modelData.important ? Qt.rgba(1, 1, 1, 0.22) : Qt.rgba(0.96, 0.62, 0.04, 0.2)
+                        border.color: modelData.important ? Qt.rgba(1, 1, 1, 0.4) : "transparent"
+                        border.width: modelData.important ? 1 : 0
                         Text {
                           id: pinKeyTxt
                           anchors.centerIn: parent
                           text: "P"
                           font.pixelSize: 8
                           font.weight: Font.Bold
-                          color: modelData.important ? "#F59E0B" : Color.muted
+                          color: modelData.important ? "#ffffff" : Color.muted
                         }
                       }
                     }
@@ -2244,7 +2303,7 @@ Item {
         // Keyboard Shortcuts Footer Hint Bar
         Rectangle {
           Layout.fillWidth: true
-          implicitHeight: 34
+          implicitHeight: 36
           radius: 8
           color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.03)
           border.color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.08)
@@ -2252,15 +2311,15 @@ Item {
 
           RowLayout {
             anchors.fill: parent
-            anchors.leftMargin: 10
-            anchors.rightMargin: 10
+            anchors.leftMargin: 12
+            anchors.rightMargin: 12
             spacing: 8
 
             // Hint: Select
             Rectangle {
               implicitHeight: 24
               implicitWidth: h1Layout.implicitWidth + 10
-              radius: 4
+              radius: 5
               color: h1Mouse.containsMouse ? Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.08) : "transparent"
               MouseArea {
                 id: h1Mouse
@@ -2272,12 +2331,14 @@ Item {
               RowLayout {
                 id: h1Layout
                 anchors.centerIn: parent
-                spacing: 4
+                spacing: 5
                 Rectangle {
-                  implicitHeight: 17
-                  implicitWidth: keyTxt1.implicitWidth + 6
-                  radius: 3
-                  color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.1)
+                  implicitHeight: 18
+                  implicitWidth: Math.max(18, keyTxt1.implicitWidth + 8)
+                  radius: 4
+                  color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.08)
+                  border.color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.16)
+                  border.width: 1
                   Text { id: keyTxt1; anchors.centerIn: parent; text: "J/K"; font.pixelSize: 9; font.weight: Font.Bold; color: Color.foreground }
                 }
                 Text { text: "Select"; font.pixelSize: 10; color: Color.muted }
@@ -2288,8 +2349,8 @@ Item {
             Rectangle {
               implicitHeight: 24
               implicitWidth: h2Layout.implicitWidth + 10
-              radius: 4
-              color: h2Mouse.containsMouse ? Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.12) : "transparent"
+              radius: 5
+              color: h2Mouse.containsMouse ? Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.15) : "transparent"
               MouseArea {
                 id: h2Mouse
                 anchors.fill: parent
@@ -2300,12 +2361,14 @@ Item {
               RowLayout {
                 id: h2Layout
                 anchors.centerIn: parent
-                spacing: 4
+                spacing: 5
                 Rectangle {
-                  implicitHeight: 17
-                  implicitWidth: keyTxt2.implicitWidth + 6
-                  radius: 3
-                  color: Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.2)
+                  implicitHeight: 18
+                  implicitWidth: Math.max(18, keyTxt2.implicitWidth + 8)
+                  radius: 4
+                  color: Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.18)
+                  border.color: Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.35)
+                  border.width: 1
                   Text { id: keyTxt2; anchors.centerIn: parent; text: "C"; font.pixelSize: 9; font.weight: Font.Bold; color: Color.accent }
                 }
                 Text { text: "New"; font.pixelSize: 10; color: Color.muted }
@@ -2316,7 +2379,7 @@ Item {
             Rectangle {
               implicitHeight: 24
               implicitWidth: h3Layout.implicitWidth + 10
-              radius: 4
+              radius: 5
               color: h3Mouse.containsMouse ? Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.08) : "transparent"
               MouseArea {
                 id: h3Mouse
@@ -2331,12 +2394,14 @@ Item {
               RowLayout {
                 id: h3Layout
                 anchors.centerIn: parent
-                spacing: 4
+                spacing: 5
                 Rectangle {
-                  implicitHeight: 17
-                  implicitWidth: keyTxt3.implicitWidth + 6
-                  radius: 3
-                  color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.1)
+                  implicitHeight: 18
+                  implicitWidth: Math.max(18, keyTxt3.implicitWidth + 8)
+                  radius: 4
+                  color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.08)
+                  border.color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.16)
+                  border.width: 1
                   Text { id: keyTxt3; anchors.centerIn: parent; text: "D / ↵"; font.pixelSize: 9; font.weight: Font.Bold; color: Color.foreground }
                 }
                 Text { text: "Diff"; font.pixelSize: 10; color: Color.muted }
@@ -2347,7 +2412,7 @@ Item {
             Rectangle {
               implicitHeight: 24
               implicitWidth: h4Layout.implicitWidth + 10
-              radius: 4
+              radius: 5
               color: h4Mouse.containsMouse ? Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.08) : "transparent"
               MouseArea {
                 id: h4Mouse
@@ -2362,24 +2427,26 @@ Item {
               RowLayout {
                 id: h4Layout
                 anchors.centerIn: parent
-                spacing: 4
+                spacing: 5
                 Rectangle {
-                  implicitHeight: 17
-                  implicitWidth: keyTxt4.implicitWidth + 6
-                  radius: 3
-                  color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.1)
+                  implicitHeight: 18
+                  implicitWidth: Math.max(18, keyTxt4.implicitWidth + 8)
+                  radius: 4
+                  color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.08)
+                  border.color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.16)
+                  border.width: 1
                   Text { id: keyTxt4; anchors.centerIn: parent; text: "B"; font.pixelSize: 9; font.weight: Font.Bold; color: Color.foreground }
                 }
                 Text { text: "Browse"; font.pixelSize: 10; color: Color.muted }
               }
             }
 
-            // Hint: Pin
+            // Hint: Pin (Sharp #ffffff vector pin)
             Rectangle {
               implicitHeight: 24
               implicitWidth: h5Layout.implicitWidth + 10
-              radius: 4
-              color: h5Mouse.containsMouse ? Qt.rgba(0.96, 0.62, 0.04, 0.12) : "transparent"
+              radius: 5
+              color: h5Mouse.containsMouse ? Qt.rgba(1, 1, 1, 0.12) : "transparent"
               MouseArea {
                 id: h5Mouse
                 anchors.fill: parent
@@ -2393,15 +2460,17 @@ Item {
               RowLayout {
                 id: h5Layout
                 anchors.centerIn: parent
-                spacing: 4
+                spacing: 5
                 Rectangle {
-                  implicitHeight: 17
-                  implicitWidth: keyTxt5.implicitWidth + 6
-                  radius: 3
-                  color: Qt.rgba(0.96, 0.62, 0.04, 0.2)
-                  Text { id: keyTxt5; anchors.centerIn: parent; text: "P"; font.pixelSize: 9; font.weight: Font.Bold; color: "#F59E0B" }
+                  implicitHeight: 18
+                  implicitWidth: Math.max(18, keyTxt5.implicitWidth + 8)
+                  radius: 4
+                  color: Qt.rgba(1, 1, 1, 0.15)
+                  border.color: Qt.rgba(1, 1, 1, 0.35)
+                  border.width: 1
+                  Text { id: keyTxt5; anchors.centerIn: parent; text: "P"; font.pixelSize: 9; font.weight: Font.Bold; color: "#ffffff" }
                 }
-                Text { text: "Pin"; font.pixelSize: 10; color: Color.muted }
+                Text { text: "󰤱 Pin"; font.pixelSize: 10; color: "#ffffff" }
               }
             }
 
@@ -2409,8 +2478,9 @@ Item {
             Rectangle {
               implicitHeight: 24
               implicitWidth: h6Layout.implicitWidth + 10
-              radius: 4
-              color: h6Mouse.containsMouse ? Qt.rgba(0.06, 0.72, 0.51, 0.12) : "transparent"
+              radius: 5
+              readonly property color restoreGreen: Qt.rgba(0.13, 0.77, 0.55, 1.0)
+              color: h6Mouse.containsMouse ? Qt.rgba(restoreGreen.r, restoreGreen.g, restoreGreen.b, 0.15) : "transparent"
               MouseArea {
                 id: h6Mouse
                 anchors.fill: parent
@@ -2425,13 +2495,15 @@ Item {
               RowLayout {
                 id: h6Layout
                 anchors.centerIn: parent
-                spacing: 4
+                spacing: 5
                 Rectangle {
-                  implicitHeight: 17
-                  implicitWidth: keyTxt6.implicitWidth + 6
-                  radius: 3
-                  color: Qt.rgba(0.06, 0.72, 0.51, 0.2)
-                  Text { id: keyTxt6; anchors.centerIn: parent; text: "R"; font.pixelSize: 9; font.weight: Font.Bold; color: "#10B981" }
+                  implicitHeight: 18
+                  implicitWidth: Math.max(18, keyTxt6.implicitWidth + 8)
+                  radius: 4
+                  color: Qt.rgba(parent.parent.restoreGreen.r, parent.parent.restoreGreen.g, parent.parent.restoreGreen.b, 0.18)
+                  border.color: Qt.rgba(parent.parent.restoreGreen.r, parent.parent.restoreGreen.g, parent.parent.restoreGreen.b, 0.35)
+                  border.width: 1
+                  Text { id: keyTxt6; anchors.centerIn: parent; text: "R"; font.pixelSize: 9; font.weight: Font.Bold; color: parent.parent.parent.restoreGreen }
                 }
                 Text { text: "Restore"; font.pixelSize: 10; color: Color.muted }
               }
@@ -2441,8 +2513,8 @@ Item {
             Rectangle {
               implicitHeight: 24
               implicitWidth: h7Layout.implicitWidth + 10
-              radius: 4
-              color: h7Mouse.containsMouse ? Qt.rgba(Color.urgent.r, Color.urgent.g, Color.urgent.b, 0.12) : "transparent"
+              radius: 5
+              color: h7Mouse.containsMouse ? Qt.rgba(Color.urgent.r, Color.urgent.g, Color.urgent.b, 0.15) : "transparent"
               MouseArea {
                 id: h7Mouse
                 anchors.fill: parent
@@ -2457,12 +2529,14 @@ Item {
               RowLayout {
                 id: h7Layout
                 anchors.centerIn: parent
-                spacing: 4
+                spacing: 5
                 Rectangle {
-                  implicitHeight: 17
-                  implicitWidth: keyTxt7.implicitWidth + 6
-                  radius: 3
-                  color: Qt.rgba(Color.urgent.r, Color.urgent.g, Color.urgent.b, 0.2)
+                  implicitHeight: 18
+                  implicitWidth: Math.max(18, keyTxt7.implicitWidth + 8)
+                  radius: 4
+                  color: Qt.rgba(Color.urgent.r, Color.urgent.g, Color.urgent.b, 0.18)
+                  border.color: Qt.rgba(Color.urgent.r, Color.urgent.g, Color.urgent.b, 0.35)
+                  border.width: 1
                   Text { id: keyTxt7; anchors.centerIn: parent; text: "X"; font.pixelSize: 9; font.weight: Font.Bold; color: Color.urgent }
                 }
                 Text { text: "Delete"; font.pixelSize: 10; color: Color.muted }
@@ -2473,7 +2547,7 @@ Item {
             Rectangle {
               implicitHeight: 24
               implicitWidth: h8Layout.implicitWidth + 10
-              radius: 4
+              radius: 5
               color: h8Mouse.containsMouse ? Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.08) : "transparent"
               MouseArea {
                 id: h8Mouse
@@ -2485,12 +2559,14 @@ Item {
               RowLayout {
                 id: h8Layout
                 anchors.centerIn: parent
-                spacing: 4
+                spacing: 5
                 Rectangle {
-                  implicitHeight: 17
-                  implicitWidth: keyTxt8.implicitWidth + 6
-                  radius: 3
-                  color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.1)
+                  implicitHeight: 18
+                  implicitWidth: Math.max(18, keyTxt8.implicitWidth + 8)
+                  radius: 4
+                  color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.08)
+                  border.color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.16)
+                  border.width: 1
                   Text { id: keyTxt8; anchors.centerIn: parent; text: "1-4 / F"; font.pixelSize: 9; font.weight: Font.Bold; color: Color.foreground }
                 }
                 Text { text: "Filter"; font.pixelSize: 10; color: Color.muted }
@@ -2501,7 +2577,7 @@ Item {
             Rectangle {
               implicitHeight: 24
               implicitWidth: hSearchLayout.implicitWidth + 10
-              radius: 4
+              radius: 5
               color: hSearchMouse.containsMouse ? Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.08) : "transparent"
               MouseArea {
                 id: hSearchMouse
@@ -2516,12 +2592,14 @@ Item {
               RowLayout {
                 id: hSearchLayout
                 anchors.centerIn: parent
-                spacing: 4
+                spacing: 5
                 Rectangle {
-                  implicitHeight: 17
-                  implicitWidth: keyTxtSearch.implicitWidth + 6
-                  radius: 3
-                  color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.1)
+                  implicitHeight: 18
+                  implicitWidth: Math.max(18, keyTxtSearch.implicitWidth + 8)
+                  radius: 4
+                  color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.08)
+                  border.color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.16)
+                  border.width: 1
                   Text { id: keyTxtSearch; anchors.centerIn: parent; text: "/"; font.pixelSize: 9; font.weight: Font.Bold; color: Color.foreground }
                 }
                 Text { text: "Search"; font.pixelSize: 10; color: Color.muted }
@@ -2532,7 +2610,7 @@ Item {
             Rectangle {
               implicitHeight: 24
               implicitWidth: h9Layout.implicitWidth + 10
-              radius: 4
+              radius: 5
               color: h9Mouse.containsMouse ? Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.08) : "transparent"
               MouseArea {
                 id: h9Mouse
@@ -2544,12 +2622,14 @@ Item {
               RowLayout {
                 id: h9Layout
                 anchors.centerIn: parent
-                spacing: 4
+                spacing: 5
                 Rectangle {
-                  implicitHeight: 17
-                  implicitWidth: keyTxt9.implicitWidth + 6
-                  radius: 3
-                  color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.1)
+                  implicitHeight: 18
+                  implicitWidth: Math.max(18, keyTxt9.implicitWidth + 8)
+                  radius: 4
+                  color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.08)
+                  border.color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.16)
+                  border.width: 1
                   Text { id: keyTxt9; anchors.centerIn: parent; text: "G"; font.pixelSize: 9; font.weight: Font.Bold; color: Color.foreground }
                 }
                 Text { text: "Refresh"; font.pixelSize: 10; color: Color.muted }
@@ -2561,8 +2641,9 @@ Item {
               id: hintOptimizePill
               implicitHeight: 24
               implicitWidth: hOptLayout.implicitWidth + 10
-              radius: 4
-              color: hOptMouse.containsMouse ? Qt.rgba(0.06, 0.72, 0.51, 0.12) : "transparent"
+              radius: 5
+              readonly property color optGreen: Qt.rgba(0.13, 0.77, 0.55, 1.0)
+              color: hOptMouse.containsMouse ? Qt.rgba(optGreen.r, optGreen.g, optGreen.b, 0.15) : "transparent"
               MouseArea {
                 id: hOptMouse
                 anchors.fill: parent
@@ -2573,13 +2654,15 @@ Item {
               RowLayout {
                 id: hOptLayout
                 anchors.centerIn: parent
-                spacing: 4
+                spacing: 5
                 Rectangle {
-                  implicitHeight: 17
-                  implicitWidth: keyTxtOpt.implicitWidth + 6
-                  radius: 3
-                  color: Qt.rgba(0.06, 0.72, 0.51, 0.2)
-                  Text { id: keyTxtOpt; anchors.centerIn: parent; text: "O"; font.pixelSize: 9; font.weight: Font.Bold; color: "#10B981" }
+                  implicitHeight: 18
+                  implicitWidth: Math.max(18, keyTxtOpt.implicitWidth + 8)
+                  radius: 4
+                  color: Qt.rgba(parent.parent.optGreen.r, parent.parent.optGreen.g, parent.parent.optGreen.b, 0.18)
+                  border.color: Qt.rgba(parent.parent.optGreen.r, parent.parent.optGreen.g, parent.parent.optGreen.b, 0.35)
+                  border.width: 1
+                  Text { id: keyTxtOpt; anchors.centerIn: parent; text: "O"; font.pixelSize: 9; font.weight: Font.Bold; color: parent.parent.parent.optGreen }
                 }
                 Text { text: "Optimize"; font.pixelSize: 10; color: Color.muted }
               }
@@ -2590,8 +2673,9 @@ Item {
               id: hintLiminePill
               implicitHeight: 24
               implicitWidth: hLimineLayout.implicitWidth + 10
-              radius: 4
-              color: hLimineMouse.containsMouse ? Qt.rgba(0.06, 0.72, 0.51, 0.12) : "transparent"
+              radius: 5
+              readonly property color limineGreen: Qt.rgba(0.13, 0.77, 0.55, 1.0)
+              color: hLimineMouse.containsMouse ? Qt.rgba(limineGreen.r, limineGreen.g, limineGreen.b, 0.15) : "transparent"
               MouseArea {
                 id: hLimineMouse
                 anchors.fill: parent
@@ -2602,13 +2686,15 @@ Item {
               RowLayout {
                 id: hLimineLayout
                 anchors.centerIn: parent
-                spacing: 4
+                spacing: 5
                 Rectangle {
-                  implicitHeight: 17
-                  implicitWidth: keyTxtLimine.implicitWidth + 6
-                  radius: 3
-                  color: Qt.rgba(0.06, 0.72, 0.51, 0.2)
-                  Text { id: keyTxtLimine; anchors.centerIn: parent; text: "L"; font.pixelSize: 9; font.weight: Font.Bold; color: "#10B981" }
+                  implicitHeight: 18
+                  implicitWidth: Math.max(18, keyTxtLimine.implicitWidth + 8)
+                  radius: 4
+                  color: Qt.rgba(parent.parent.limineGreen.r, parent.parent.limineGreen.g, parent.parent.limineGreen.b, 0.18)
+                  border.color: Qt.rgba(parent.parent.limineGreen.r, parent.parent.limineGreen.g, parent.parent.limineGreen.b, 0.35)
+                  border.width: 1
+                  Text { id: keyTxtLimine; anchors.centerIn: parent; text: "L"; font.pixelSize: 9; font.weight: Font.Bold; color: parent.parent.parent.limineGreen }
                 }
                 Text { text: "Limine"; font.pixelSize: 10; color: Color.muted }
               }
@@ -2620,7 +2706,7 @@ Item {
             Rectangle {
               implicitHeight: 24
               implicitWidth: h10Layout.implicitWidth + 10
-              radius: 4
+              radius: 5
               color: h10Mouse.containsMouse ? Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.08) : "transparent"
               MouseArea {
                 id: h10Mouse
@@ -2632,12 +2718,14 @@ Item {
               RowLayout {
                 id: h10Layout
                 anchors.centerIn: parent
-                spacing: 4
+                spacing: 5
                 Rectangle {
-                  implicitHeight: 17
-                  implicitWidth: keyTxt10.implicitWidth + 6
-                  radius: 3
-                  color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.1)
+                  implicitHeight: 18
+                  implicitWidth: Math.max(18, keyTxt10.implicitWidth + 8)
+                  radius: 4
+                  color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.08)
+                  border.color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.16)
+                  border.width: 1
                   Text { id: keyTxt10; anchors.centerIn: parent; text: "Esc / Q"; font.pixelSize: 9; font.weight: Font.Bold; color: Color.foreground }
                 }
                 Text { text: "Close"; font.pixelSize: 10; color: Color.muted }
