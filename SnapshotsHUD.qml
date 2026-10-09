@@ -1341,20 +1341,21 @@ Item {
           Layout.fillWidth: true
           implicitHeight: authLayout.implicitHeight + 20
           radius: 10
-          color: Qt.rgba(0.96, 0.62, 0.04, 0.12)
-          border.color: Qt.rgba(0.96, 0.62, 0.04, 0.35)
+          readonly property color authWarnColor: Qt.rgba(0.96, 0.62, 0.15, 1.0)
+          color: Qt.rgba(authWarnColor.r, authWarnColor.g, authWarnColor.b, 0.12)
+          border.color: Qt.rgba(authWarnColor.r, authWarnColor.g, authWarnColor.b, 0.35)
           border.width: 1
 
           RowLayout {
             id: authLayout
             anchors.fill: parent
-            anchors.margins: 10
+            anchors.margins: 12
             spacing: 12
 
             Text {
               text: "󰌋"
               font.pixelSize: 22
-              color: "#F59E0B"
+              color: parent.parent.authWarnColor
             }
 
             ColumnLayout {
@@ -1379,7 +1380,7 @@ Item {
               implicitHeight: 30
               implicitWidth: authBtnText.implicitWidth + 20
               radius: 6
-              color: "#F59E0B"
+              color: parent.parent.authWarnColor
 
               MouseArea {
                 anchors.fill: parent
@@ -1393,7 +1394,7 @@ Item {
                 text: "Authorize Access"
                 font.pixelSize: 11
                 font.weight: Font.Bold
-                color: "#181825"
+                color: Color.background
               }
             }
           }
@@ -1401,143 +1402,246 @@ Item {
 
         // Storage & Telemetry Bar
         Rectangle {
+          id: storageTelemetryCard
           Layout.fillWidth: true
-          implicitHeight: 46
+          implicitHeight: 52
           radius: 10
           color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.03)
           border.color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.08)
           border.width: 1
 
+          property var storage: (root.statusData && root.statusData.storage) || ({})
+          property int pct: storage.usedPercent || 0
+          readonly property color meterColor: pct > 85 ? Color.urgent : (pct > 70 ? Qt.rgba(0.96, 0.62, 0.15, 1.0) : Color.accent)
+          readonly property string subvolPath: (root.statusData && root.statusData.configs && root.statusData.configs[0] && root.statusData.configs[0].subvolume) || "/"
+
           RowLayout {
             anchors.fill: parent
-            anchors.margins: 12
+            anchors.leftMargin: 14
+            anchors.rightMargin: 14
             spacing: 16
 
-            // Storage telemetry
+            // Storage telemetry section (Left)
             RowLayout {
-              spacing: 8
-              Text {
-                text: "󰋊"
-                font.pixelSize: 14
-                color: Color.muted
-              }
-              Text {
-                property var storage: (root.statusData && root.statusData.storage) || ({})
-                text: "Storage: " + (storage.fsAvailHuman || "0 B") + " free of " + (storage.fsSizeHuman || "0 B")
-                font.pixelSize: 12
-                color: Color.foreground
-              }
-            }
-
-            // Usage meter bar
-            Rectangle {
-              Layout.fillWidth: true
-              height: 6
-              radius: 3
-              color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.08)
+              spacing: 10
+              Layout.alignment: Qt.AlignVCenter
 
               Rectangle {
-                property int pct: (root.statusData && root.statusData.storage && root.statusData.storage.usedPercent) || 0
-                width: parent.width * Math.min(1.0, (pct / 100.0))
-                height: parent.height
-                radius: 3
-                color: pct > 85 ? Color.urgent : (pct > 70 ? "#F59E0B" : Color.accent)
+                width: 32
+                height: 32
+                radius: 8
+                color: Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.12)
+                border.color: Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.25)
+                border.width: 1
+
+                Text {
+                  anchors.centerIn: parent
+                  text: "󰋊"
+                  font.pixelSize: 16
+                  color: Color.accent
+                }
+              }
+
+              ColumnLayout {
+                spacing: 2
+                Layout.alignment: Qt.AlignVCenter
+
+                RowLayout {
+                  spacing: 6
+                  Text {
+                    text: "Btrfs Storage Pool"
+                    font.pixelSize: 12
+                    font.weight: Font.DemiBold
+                    color: Color.foreground
+                  }
+                  Rectangle {
+                    implicitHeight: 16
+                    implicitWidth: subvolTxt.implicitWidth + 8
+                    radius: 4
+                    color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.06)
+                    border.color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.12)
+                    border.width: 1
+                    Text {
+                      id: subvolTxt
+                      anchors.centerIn: parent
+                      text: "@" + (storageTelemetryCard.subvolPath === "/" ? "root" : storageTelemetryCard.subvolPath.replace(/^\//, ""))
+                      font.pixelSize: 9
+                      font.weight: Font.Medium
+                      color: Color.muted
+                    }
+                  }
+                }
+
+                Text {
+                  text: (storageTelemetryCard.storage.fsAvailHuman || "0 B") + " free of " + (storageTelemetryCard.storage.fsSizeHuman || "0 B")
+                  font.pixelSize: 11
+                  color: Color.muted
+                }
               }
             }
 
-            // Interactive Limine Bootloader Health Button Chip
-            Rectangle {
-              id: limineBootBtn
-              implicitHeight: 26
-              implicitWidth: limineBtnRow.implicitWidth + 14
-              radius: 6
-              property bool syncActive: (root.statusData && root.statusData.health && root.statusData.health.limineSyncActive) === true
-              color: limineBtnMouse.containsMouse ? (syncActive ? Qt.rgba(0.06, 0.72, 0.51, 0.22) : Qt.rgba(0.94, 0.27, 0.27, 0.22)) : (syncActive ? Qt.rgba(0.06, 0.72, 0.51, 0.12) : Qt.rgba(0.94, 0.27, 0.27, 0.12))
-              border.color: limineBtnMouse.containsMouse ? (syncActive ? "#10B981" : "#EF4444") : (syncActive ? Qt.rgba(0.06, 0.72, 0.51, 0.3) : Qt.rgba(0.94, 0.27, 0.27, 0.3))
-              border.width: 1
+            // Usage meter track (Center)
+            RowLayout {
+              Layout.fillWidth: true
+              Layout.alignment: Qt.AlignVCenter
+              spacing: 10
 
-              MouseArea {
-                id: limineBtnMouse
-                anchors.fill: parent
-                hoverEnabled: true
-                cursorShape: Qt.PointingHandCursor
-                onClicked: root.openBootModal()
-              }
+              Rectangle {
+                Layout.fillWidth: true
+                height: 8
+                radius: 4
+                color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.08)
+                clip: true
 
-              RowLayout {
-                id: limineBtnRow
-                anchors.centerIn: parent
-                spacing: 5
-
-                Text {
-                  text: limineBootBtn.syncActive ? "󰌢" : "󰌣"
-                  font.pixelSize: 12
-                  color: limineBootBtn.syncActive ? "#10B981" : "#EF4444"
-                }
-                Text {
-                  text: limineBootBtn.syncActive ? "Limine Boot Sync" : "Boot Sync Offline"
-                  font.pixelSize: 11
-                  font.weight: Font.Medium
-                  color: limineBootBtn.syncActive ? Color.foreground : "#EF4444"
-                }
                 Rectangle {
-                  implicitHeight: 15
-                  implicitWidth: limineKeyTxt.implicitWidth + 6
-                  radius: 3
-                  color: limineBootBtn.syncActive ? Qt.rgba(0.06, 0.72, 0.51, 0.25) : Qt.rgba(0.94, 0.27, 0.27, 0.25)
-                  Text {
-                    id: limineKeyTxt
-                    anchors.centerIn: parent
-                    text: "L"
-                    font.pixelSize: 8
-                    font.weight: Font.Bold
-                    color: limineBootBtn.syncActive ? "#10B981" : "#EF4444"
+                  width: Math.max(height, parent.width * Math.min(1.0, (storageTelemetryCard.pct / 100.0)))
+                  height: parent.height
+                  radius: 4
+                  color: storageTelemetryCard.meterColor
+
+                  Behavior on width {
+                    NumberAnimation { duration: 300; easing.type: Easing.OutCubic }
                   }
                 }
               }
+
+              Text {
+                text: storageTelemetryCard.pct + "% used"
+                font.pixelSize: 11
+                font.weight: Font.Medium
+                color: storageTelemetryCard.meterColor
+              }
             }
 
-            // Optimize Disk Button Chip
+            // Divider line between telemetry and actions
             Rectangle {
-              id: optimizeDiskBtn
-              implicitHeight: 26
-              implicitWidth: optBtnRow.implicitWidth + 14
-              radius: 6
-              color: optMouse.containsMouse ? Qt.rgba(0.06, 0.72, 0.51, 0.22) : Qt.rgba(0.06, 0.72, 0.51, 0.12)
-              border.color: optMouse.containsMouse ? "#10B981" : Qt.rgba(0.06, 0.72, 0.51, 0.3)
-              border.width: 1
+              width: 1
+              height: 24
+              color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.10)
+              Layout.alignment: Qt.AlignVCenter
+            }
 
-              MouseArea {
-                id: optMouse
-                anchors.fill: parent
-                hoverEnabled: true
-                cursorShape: Qt.PointingHandCursor
-                onClicked: root.openOptimizeModal()
+            // Maintenance Quick Actions (Right)
+            RowLayout {
+              spacing: 8
+              Layout.alignment: Qt.AlignVCenter
+
+              // Interactive Limine Bootloader Health Button Chip
+              Rectangle {
+                id: limineBootBtn
+                implicitHeight: 28
+                implicitWidth: limineBtnRow.implicitWidth + 16
+                radius: 6
+                property bool syncActive: (root.statusData && root.statusData.health && root.statusData.health.limineSyncActive) === true
+                readonly property color bootColor: syncActive ? Qt.rgba(0.13, 0.77, 0.55, 1.0) : Color.urgent
+
+                color: limineBtnMouse.containsMouse 
+                  ? Qt.rgba(bootColor.r, bootColor.g, bootColor.b, 0.20) 
+                  : Qt.rgba(bootColor.r, bootColor.g, bootColor.b, 0.09)
+                border.color: limineBtnMouse.containsMouse 
+                  ? bootColor 
+                  : Qt.rgba(bootColor.r, bootColor.g, bootColor.b, 0.30)
+                border.width: 1
+
+                MouseArea {
+                  id: limineBtnMouse
+                  anchors.fill: parent
+                  hoverEnabled: true
+                  cursorShape: Qt.PointingHandCursor
+                  onClicked: root.openBootModal()
+                }
+
+                RowLayout {
+                  id: limineBtnRow
+                  anchors.centerIn: parent
+                  spacing: 6
+
+                  Text {
+                    text: limineBootBtn.syncActive ? "󰌢" : "󰌣"
+                    font.pixelSize: 12
+                    color: limineBootBtn.bootColor
+                  }
+                  Text {
+                    text: limineBootBtn.syncActive ? "Limine Boot Sync" : "Boot Sync Offline"
+                    font.pixelSize: 11
+                    font.weight: Font.Medium
+                    color: limineBootBtn.syncActive ? Color.foreground : Color.urgent
+                  }
+                  Rectangle {
+                    implicitHeight: 16
+                    implicitWidth: Math.max(16, limineKeyTxt.implicitWidth + 8)
+                    radius: 3
+                    color: Qt.rgba(limineBootBtn.bootColor.r, limineBootBtn.bootColor.g, limineBootBtn.bootColor.b, 0.20)
+                    border.color: Qt.rgba(limineBootBtn.bootColor.r, limineBootBtn.bootColor.g, limineBootBtn.bootColor.b, 0.35)
+                    border.width: 1
+
+                    Text {
+                      id: limineKeyTxt
+                      anchors.centerIn: parent
+                      text: "L"
+                      font.pixelSize: 8
+                      font.weight: Font.Bold
+                      color: limineBootBtn.bootColor
+                    }
+                  }
+                }
               }
 
-              RowLayout {
-                id: optBtnRow
-                anchors.centerIn: parent
-                spacing: 5
-                Text { text: "󰚰"; font.pixelSize: 12; color: "#10B981" }
-                Text {
-                  text: "Optimize Disk"
-                  font.pixelSize: 11
-                  font.weight: Font.DemiBold
-                  color: "#10B981"
+              // Optimize Disk Button Chip
+              Rectangle {
+                id: optimizeDiskBtn
+                implicitHeight: 28
+                implicitWidth: optBtnRow.implicitWidth + 16
+                radius: 6
+                readonly property color optColor: Qt.rgba(0.13, 0.77, 0.55, 1.0)
+                color: optMouse.containsMouse 
+                  ? Qt.rgba(optColor.r, optColor.g, optColor.b, 0.20) 
+                  : Qt.rgba(optColor.r, optColor.g, optColor.b, 0.09)
+                border.color: optMouse.containsMouse 
+                  ? optColor 
+                  : Qt.rgba(optColor.r, optColor.g, optColor.b, 0.30)
+                border.width: 1
+
+                MouseArea {
+                  id: optMouse
+                  anchors.fill: parent
+                  hoverEnabled: true
+                  cursorShape: Qt.PointingHandCursor
+                  onClicked: root.openOptimizeModal()
                 }
-                Rectangle {
-                  implicitHeight: 14
-                  implicitWidth: keyOptTxt.implicitWidth + 4
-                  radius: 2
-                  color: Qt.rgba(0, 0, 0, 0.2)
+
+                RowLayout {
+                  id: optBtnRow
+                  anchors.centerIn: parent
+                  spacing: 6
+
                   Text {
-                    id: keyOptTxt
-                    anchors.centerIn: parent
-                    text: "O"
-                    font.pixelSize: 8
-                    font.weight: Font.Bold
-                    color: "#10B981"
+                    text: "󰚰"
+                    font.pixelSize: 12
+                    color: optimizeDiskBtn.optColor
+                  }
+                  Text {
+                    text: "Optimize Disk"
+                    font.pixelSize: 11
+                    font.weight: Font.Medium
+                    color: Color.foreground
+                  }
+                  Rectangle {
+                    implicitHeight: 16
+                    implicitWidth: Math.max(16, keyOptTxt.implicitWidth + 8)
+                    radius: 3
+                    color: Qt.rgba(optimizeDiskBtn.optColor.r, optimizeDiskBtn.optColor.g, optimizeDiskBtn.optColor.b, 0.20)
+                    border.color: Qt.rgba(optimizeDiskBtn.optColor.r, optimizeDiskBtn.optColor.g, optimizeDiskBtn.optColor.b, 0.35)
+                    border.width: 1
+
+                    Text {
+                      id: keyOptTxt
+                      anchors.centerIn: parent
+                      text: "O"
+                      font.pixelSize: 8
+                      font.weight: Font.Bold
+                      color: optimizeDiskBtn.optColor
+                    }
                   }
                 }
               }
