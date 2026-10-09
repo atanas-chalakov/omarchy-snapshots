@@ -1017,6 +1017,7 @@ Item {
           spacing: 14
 
           Rectangle {
+            Layout.alignment: Qt.AlignVCenter
             width: 44
             height: 44
             radius: 12
@@ -1033,11 +1034,14 @@ Item {
           }
 
           ColumnLayout {
-            spacing: 2
+            spacing: 3
             Layout.fillWidth: true
+            Layout.alignment: Qt.AlignVCenter
 
             RowLayout {
-              spacing: 8
+              spacing: 10
+              Layout.alignment: Qt.AlignVCenter
+
               Text {
                 text: "Snapshots & Recovery"
                 font.pixelSize: 18
@@ -1047,30 +1051,39 @@ Item {
 
               // Health Status Pill
               Rectangle {
+                id: healthPill
                 property var health: (root.statusData && root.statusData.health) || ({})
                 property string status: health.status || "warning"
+                readonly property color statusColor: status === "healthy"
+                  ? Qt.rgba(0.13, 0.77, 0.55, 1.0)
+                  : (status === "error" ? Color.urgent : Qt.rgba(0.96, 0.62, 0.15, 1.0))
+
+                Layout.alignment: Qt.AlignVCenter
                 implicitHeight: 22
-                implicitWidth: healthLabel.implicitWidth + 16
+                implicitWidth: healthContent.implicitWidth + 16
                 radius: 11
-                color: status === "healthy" ? Qt.rgba(0.06, 0.72, 0.51, 0.18) : (status === "error" ? Qt.rgba(0.94, 0.27, 0.27, 0.2) : Qt.rgba(0.96, 0.62, 0.04, 0.2))
-                border.color: status === "healthy" ? "#10B981" : (status === "error" ? "#EF4444" : "#F59E0B")
+                color: Qt.rgba(statusColor.r, statusColor.g, statusColor.b, 0.14)
+                border.color: Qt.rgba(statusColor.r, statusColor.g, statusColor.b, 0.40)
                 border.width: 1
 
                 RowLayout {
+                  id: healthContent
                   anchors.centerIn: parent
-                  spacing: 4
+                  spacing: 6
+
                   Rectangle {
                     width: 6
                     height: 6
                     radius: 3
-                    color: parent.parent.border.color
+                    color: healthPill.statusColor
                   }
+
                   Text {
                     id: healthLabel
                     text: (root.statusData && root.statusData.health && root.statusData.health.label) || "Checking..."
                     font.pixelSize: 11
-                    font.weight: Font.Medium
-                    color: Color.foreground
+                    font.weight: Font.DemiBold
+                    color: healthPill.statusColor
                   }
                 }
               }
@@ -1078,7 +1091,7 @@ Item {
 
             Text {
               text: (root.statusData && root.statusData.health && root.statusData.health.reason) || "Checking Btrfs subvolumes and bootloader synchronization..."
-              font.pixelSize: 12
+              font.pixelSize: 11
               color: Color.muted
               elide: Text.ElideRight
               Layout.fillWidth: true
@@ -1088,37 +1101,57 @@ Item {
           // Top Action Buttons
           RowLayout {
             spacing: 8
+            Layout.alignment: Qt.AlignVCenter
 
-            // Mock toggle chip (useful for testing or demonstration)
+            // Demo toggle chip (useful for testing or demonstration)
             Rectangle {
-              implicitHeight: 34
-              implicitWidth: mockToggleText.implicitWidth + 20
+              id: mockToggleBtn
+              implicitHeight: 32
+              implicitWidth: mockToggleRow.implicitWidth + 20
               radius: 8
-              color: root.useMockData ? Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.25) : Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.05)
+              color: root.useMockData 
+                ? (mockMouse.containsMouse ? Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.32) : Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.22))
+                : (mockMouse.containsMouse ? Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.08) : Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.03))
               border.color: root.useMockData ? Color.accent : Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.12)
               border.width: 1
 
               MouseArea {
+                id: mockMouse
                 anchors.fill: parent
+                hoverEnabled: true
                 cursorShape: Qt.PointingHandCursor
                 onClicked: root.useMockData = !root.useMockData
               }
 
-              Text {
-                id: mockToggleText
+              RowLayout {
+                id: mockToggleRow
                 anchors.centerIn: parent
-                text: root.useMockData ? "Demo Data: ON" : "Demo Data: OFF"
-                font.pixelSize: 11
-                color: root.useMockData ? Color.accent : Color.muted
+                spacing: 6
+
+                Rectangle {
+                  width: 6
+                  height: 6
+                  radius: 3
+                  color: root.useMockData ? Color.accent : Color.muted
+                }
+
+                Text {
+                  id: mockToggleText
+                  text: root.useMockData ? "Demo Data: ON" : "Demo Data: OFF"
+                  font.pixelSize: 11
+                  font.weight: root.useMockData ? Font.DemiBold : Font.Normal
+                  color: root.useMockData ? Color.accent : Color.muted
+                }
               }
             }
 
             // Refresh Button
             Rectangle {
-              implicitHeight: 34
+              id: refreshBtn
+              implicitHeight: 32
               implicitWidth: refreshBtnLayout.implicitWidth + 18
               radius: 8
-              color: refreshMouse.containsMouse ? Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.10) : Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.04)
+              color: refreshMouse.containsMouse ? Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.08) : Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.03)
               border.color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.12)
               border.width: 1
 
@@ -1136,19 +1169,24 @@ Item {
               RowLayout {
                 id: refreshBtnLayout
                 anchors.centerIn: parent
-                spacing: 6
+                spacing: 7
+
                 Text {
                   text: "󰑐"
                   font.pixelSize: 13
-                  color: root.isRefreshing ? Color.accent : Color.foreground
+                  color: root.isRefreshing ? Color.accent : (refreshMouse.containsMouse ? Color.foreground : Color.muted)
                   rotation: root.isRefreshing ? 180 : 0
                   Behavior on rotation { NumberAnimation { duration: 400 } }
                 }
+
                 Rectangle {
-                  implicitHeight: 16
-                  implicitWidth: keyRefTxt.implicitWidth + 6
-                  radius: 3
-                  color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.1)
+                  implicitHeight: 18
+                  implicitWidth: Math.max(18, keyRefTxt.implicitWidth + 8)
+                  radius: 4
+                  color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.08)
+                  border.color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.16)
+                  border.width: 1
+
                   Text {
                     id: keyRefTxt
                     anchors.centerIn: parent
@@ -1163,10 +1201,11 @@ Item {
 
             // New Checkpoint Button
             Rectangle {
-              implicitHeight: 34
-              implicitWidth: createBtnLayout.implicitWidth + 22
+              id: createBtn
+              implicitHeight: 32
+              implicitWidth: createBtnLayout.implicitWidth + 20
               radius: 8
-              color: createMouse.containsMouse ? Qt.darker(Color.accent, 1.1) : Color.accent
+              color: createMouse.containsMouse ? Qt.lighter(Color.accent, 1.12) : Color.accent
 
               MouseArea {
                 id: createMouse
@@ -1182,7 +1221,8 @@ Item {
               RowLayout {
                 id: createBtnLayout
                 anchors.centerIn: parent
-                spacing: 6
+                spacing: 7
+
                 Text {
                   text: "󰐕"
                   font.pixelSize: 14
@@ -1195,10 +1235,13 @@ Item {
                   color: Color.background
                 }
                 Rectangle {
-                  implicitHeight: 16
-                  implicitWidth: keyNewTxt.implicitWidth + 6
-                  radius: 3
-                  color: Qt.rgba(0, 0, 0, 0.25)
+                  implicitHeight: 18
+                  implicitWidth: Math.max(18, keyNewTxt.implicitWidth + 8)
+                  radius: 4
+                  color: Qt.rgba(0, 0, 0, 0.22)
+                  border.color: Qt.rgba(255, 255, 255, 0.18)
+                  border.width: 1
+
                   Text {
                     id: keyNewTxt
                     anchors.centerIn: parent
@@ -1213,11 +1256,12 @@ Item {
 
             // Close Window Button
             Rectangle {
-              implicitHeight: 34
+              id: closeBtn
+              implicitHeight: 32
               implicitWidth: closeBtnLayout.implicitWidth + 16
               radius: 8
-              color: closeMouse.containsMouse ? Qt.rgba(Color.urgent.r, Color.urgent.g, Color.urgent.b, 0.2) : Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.04)
-              border.color: closeMouse.containsMouse ? Color.urgent : Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.12)
+              color: closeMouse.containsMouse ? Qt.rgba(Color.urgent.r, Color.urgent.g, Color.urgent.b, 0.18) : Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.03)
+              border.color: closeMouse.containsMouse ? Qt.rgba(Color.urgent.r, Color.urgent.g, Color.urgent.b, 0.5) : Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.12)
               border.width: 1
 
               MouseArea {
@@ -1231,24 +1275,29 @@ Item {
               RowLayout {
                 id: closeBtnLayout
                 anchors.centerIn: parent
-                spacing: 5
+                spacing: 6
+
                 Text {
                   text: "󰅖"
                   font.pixelSize: 13
                   color: closeMouse.containsMouse ? Color.urgent : Color.muted
                 }
+
                 Rectangle {
-                  implicitHeight: 16
-                  implicitWidth: keyEscTxt.implicitWidth + 6
-                  radius: 3
-                  color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.1)
+                  implicitHeight: 18
+                  implicitWidth: Math.max(18, keyEscTxt.implicitWidth + 8)
+                  radius: 4
+                  color: closeMouse.containsMouse ? Qt.rgba(Color.urgent.r, Color.urgent.g, Color.urgent.b, 0.15) : Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.08)
+                  border.color: closeMouse.containsMouse ? Qt.rgba(Color.urgent.r, Color.urgent.g, Color.urgent.b, 0.3) : Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.16)
+                  border.width: 1
+
                   Text {
                     id: keyEscTxt
                     anchors.centerIn: parent
                     text: "Esc"
                     font.pixelSize: 9
                     font.weight: Font.Bold
-                    color: Color.muted
+                    color: closeMouse.containsMouse ? Color.urgent : Color.muted
                   }
                 }
               }
