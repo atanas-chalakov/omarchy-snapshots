@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+# Launch Omarchy Snapshots HUD in development mode with Demo Data enabled
+export OMARCHY_SNAPSHOTS_DEV=1
+if command -v omarchy-shell >/dev/null 2>&1; then
+  exec omarchy-shell shell toggle ac.snapshots '{"mock":true}'
+else
+  SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+  PLUGIN_DIR="$(dirname "$SCRIPT_DIR")"
+  exec quickshell -p "$PLUGIN_DIR/SnapshotsHUD.qml"
+fi

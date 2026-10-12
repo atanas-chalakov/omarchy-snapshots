@@ -13,6 +13,7 @@ Item {
   property var manifest: null
   property bool closingFromHost: false
   property bool useMockData: false
+  readonly property bool devMode: (Quickshell.env("OMARCHY_SNAPSHOTS_DEV") === "1" || Quickshell.env("OMARCHY_DEV") === "1" || useMockData)
 
   readonly property string homeDir: Quickshell.env("HOME") || "/home/ac"
   readonly property string pluginPath: manifest && manifest.__sourceDir 
@@ -1103,16 +1104,17 @@ Item {
             spacing: 8
             Layout.alignment: Qt.AlignVCenter
 
-            // Demo toggle chip (useful for testing or demonstration)
+            // Demo toggle chip (only visible in development mode)
             Rectangle {
               id: mockToggleBtn
+              visible: root.devMode
               implicitHeight: 32
               implicitWidth: mockToggleRow.implicitWidth + 20
               radius: 8
               color: root.useMockData 
-                ? (mockMouse.containsMouse ? Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.32) : Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.22))
+                ? (mockMouse.containsMouse ? Qt.rgba(0.99, 0.82, 0.20, 0.32) : Qt.rgba(0.99, 0.82, 0.20, 0.22))
                 : (mockMouse.containsMouse ? Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.08) : Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.03))
-              border.color: root.useMockData ? Color.accent : Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.12)
+              border.color: root.useMockData ? "#FDE047" : Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.12)
               border.width: 1
 
               MouseArea {
@@ -1132,15 +1134,15 @@ Item {
                   width: 6
                   height: 6
                   radius: 3
-                  color: root.useMockData ? Color.accent : Color.muted
+                  color: root.useMockData ? "#FDE047" : Color.muted
                 }
 
                 Text {
                   id: mockToggleText
-                  text: root.useMockData ? "Demo Data: ON" : "Demo Data: OFF"
+                  text: root.useMockData ? "DEV: Demo ON" : "DEV: Demo OFF"
                   font.pixelSize: 11
                   font.weight: root.useMockData ? Font.DemiBold : Font.Normal
-                  color: root.useMockData ? Color.accent : Color.muted
+                  color: root.useMockData ? "#FDE047" : Color.muted
                 }
               }
             }
@@ -1899,8 +1901,21 @@ Item {
                 : (cardMouse.containsMouse ? Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.05) : Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.02))
               border.color: isSelected
                 ? Color.accent
-                : (modelData.important ? Qt.rgba(0.96, 0.62, 0.04, 0.4) : Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.08))
-              border.width: isSelected ? 2 : 1
+                : (modelData.important ? Qt.rgba(0.99, 0.88, 0.28, 0.45) : Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.08))
+              border.width: isSelected ? 1.5 : 1
+
+              // Left Accent Stripe Indicator
+              Rectangle {
+                id: selectionStripe
+                width: 3.5
+                height: parent.height - 16
+                radius: 2
+                anchors.left: parent.left
+                anchors.leftMargin: 4
+                anchors.verticalCenter: parent.verticalCenter
+                visible: isSelected || (modelData.important === true)
+                color: isSelected ? Color.accent : "#FDE047"
+              }
 
               MouseArea {
                 id: cardMouse
@@ -1917,7 +1932,10 @@ Item {
               RowLayout {
                 id: cardLayout
                 anchors.fill: parent
-                anchors.margins: 12
+                anchors.leftMargin: 14
+                anchors.rightMargin: 12
+                anchors.topMargin: 10
+                anchors.bottomMargin: 10
                 spacing: 14
 
                 // Snapshot ID Badge
@@ -1943,6 +1961,7 @@ Item {
                       Layout.alignment: Qt.AlignHCenter
                       text: modelData.cleanup === "none" ? "keep" : "auto"
                       font.pixelSize: 9
+                      font.weight: Font.Medium
                       color: modelData.important ? "#FDE047" : Color.muted
                     }
                   }
@@ -1992,9 +2011,9 @@ Item {
 
                     // Bootable in Limine Chip
                     Rectangle {
-                      implicitHeight: 18
+                      implicitHeight: 20
                       implicitWidth: bootChipRow.implicitWidth + 12
-                      radius: 9
+                      radius: 10
                       property bool isBootable: (modelData.bootableInLimine !== false)
                       color: isBootable ? Qt.rgba(0.06, 0.72, 0.51, 0.15) : Qt.rgba(0.94, 0.27, 0.27, 0.15)
                       border.color: isBootable ? Qt.rgba(0.06, 0.72, 0.51, 0.3) : Qt.rgba(0.94, 0.27, 0.27, 0.3)
@@ -2006,7 +2025,7 @@ Item {
                         spacing: 3
                         Text {
                           text: parent.parent.isBootable ? "󰌢" : "󰌣"
-                          font.pixelSize: 9
+                          font.pixelSize: 10
                           color: parent.parent.isBootable ? "#10B981" : "#EF4444"
                         }
                         Text {
@@ -2021,9 +2040,9 @@ Item {
                     // Package Updates Chip
                     Rectangle {
                       visible: (modelData.packageCount && modelData.packageCount > 0) ? true : false
-                      implicitHeight: 18
+                      implicitHeight: 20
                       implicitWidth: pkgChipLayout.implicitWidth + 12
-                      radius: 9
+                      radius: 10
                       color: modelData.hasCriticalPackages ? Qt.rgba(0.96, 0.62, 0.04, 0.2) : Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.15)
                       border.color: modelData.hasCriticalPackages ? "#F59E0B" : Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.3)
                       border.width: 1
@@ -2034,7 +2053,7 @@ Item {
                         spacing: 4
                         Text {
                           text: modelData.hasCriticalPackages ? "󰒋" : "󰏔"
-                          font.pixelSize: 9
+                          font.pixelSize: 10
                           color: modelData.hasCriticalPackages ? "#F59E0B" : Color.accent
                         }
                         Text {
@@ -2100,7 +2119,7 @@ Item {
                       Text { text: "󰙅"; font.pixelSize: 11; color: Color.accent }
                       Text { text: "Diff"; font.pixelSize: 11; font.weight: Font.Medium; color: Color.accent }
                       Rectangle {
-                        implicitHeight: 15
+                        implicitHeight: 16
                         implicitWidth: diffKeyTxt.implicitWidth + 6
                         radius: 3
                         color: Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.25)
@@ -2144,7 +2163,7 @@ Item {
                       Text { text: "󰝰"; font.pixelSize: 11; color: Color.muted }
                       Text { text: "Browse"; font.pixelSize: 11; font.weight: Font.Medium; color: Color.foreground }
                       Rectangle {
-                        implicitHeight: 15
+                        implicitHeight: 16
                         implicitWidth: browseKeyTxt.implicitWidth + 6
                         radius: 3
                         color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.1)
@@ -2239,7 +2258,7 @@ Item {
                       Text { text: "󰁯"; font.pixelSize: 11; color: "#10B981" }
                       Text { text: "Restore"; font.pixelSize: 11; font.weight: Font.Medium; color: "#10B981" }
                       Rectangle {
-                        implicitHeight: 15
+                        implicitHeight: 16
                         implicitWidth: resKeyTxt.implicitWidth + 6
                         radius: 3
                         color: Qt.rgba(0.06, 0.72, 0.51, 0.25)
@@ -2258,10 +2277,10 @@ Item {
                   // Delete Button
                   Rectangle {
                     implicitHeight: 28
-                    implicitWidth: delBtnLayout.implicitWidth + 12
+                    implicitWidth: delBtnLayout.implicitWidth + 14
                     radius: 6
                     color: delHover.containsMouse ? Qt.rgba(Color.urgent.r, Color.urgent.g, Color.urgent.b, 0.2) : Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.04)
-                    border.color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.1)
+                    border.color: delHover.containsMouse ? Qt.rgba(Color.urgent.r, Color.urgent.g, Color.urgent.b, 0.4) : Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.1)
                     border.width: 1
 
                     MouseArea {
@@ -2286,10 +2305,10 @@ Item {
                         color: delHover.containsMouse ? Color.urgent : Color.muted
                       }
                       Rectangle {
-                        implicitHeight: 15
+                        implicitHeight: 16
                         implicitWidth: delKeyTxt.implicitWidth + 6
                         radius: 3
-                        color: Qt.rgba(Color.urgent.r, Color.urgent.g, Color.urgent.b, 0.2)
+                        color: delHover.containsMouse ? Qt.rgba(Color.urgent.r, Color.urgent.g, Color.urgent.b, 0.3) : Qt.rgba(Color.urgent.r, Color.urgent.g, Color.urgent.b, 0.18)
                         Text {
                           id: delKeyTxt
                           anchors.centerIn: parent
