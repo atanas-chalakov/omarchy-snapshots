@@ -2766,7 +2766,7 @@ Item {
       Rectangle {
         visible: root.showCreateModal
         anchors.fill: parent
-        color: Qt.rgba(0, 0, 0, 0.65)
+        color: Qt.rgba(0, 0, 0, 0.68)
 
         MouseArea {
           anchors.fill: parent
@@ -2775,12 +2775,12 @@ Item {
 
         Rectangle {
           anchors.centerIn: parent
-          width: 480
-          implicitHeight: createModalCol.implicitHeight + 36
+          width: 500
+          implicitHeight: createModalCol.implicitHeight + 40
           radius: 12
           color: Color.background
-          border.color: Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.4)
-          border.width: 1
+          border.color: Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.35)
+          border.width: 1.5
 
           MouseArea { anchors.fill: parent }
 
@@ -2792,6 +2792,12 @@ Item {
 
             RowLayout {
               Layout.fillWidth: true
+              spacing: 8
+              Text {
+                text: "󰄬"
+                font.pixelSize: 18
+                color: Color.accent
+              }
               Text {
                 text: "Create Recovery Checkpoint"
                 font.pixelSize: 16
@@ -2799,14 +2805,23 @@ Item {
                 color: Color.foreground
               }
               Item { Layout.fillWidth: true }
-              Text {
-                text: "󰅖"
-                font.pixelSize: 14
-                color: Color.muted
+              Rectangle {
+                implicitWidth: 26
+                implicitHeight: 26
+                radius: 6
+                color: createCloseHover.containsMouse ? Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.08) : "transparent"
                 MouseArea {
+                  id: createCloseHover
                   anchors.fill: parent
+                  hoverEnabled: true
                   cursorShape: Qt.PointingHandCursor
                   onClicked: root.showCreateModal = false
+                }
+                Text {
+                  anchors.centerIn: parent
+                  text: "󰅖"
+                  font.pixelSize: 13
+                  color: createCloseHover.containsMouse ? Color.foreground : Color.muted
                 }
               }
             }
@@ -2831,14 +2846,16 @@ Item {
                 ]
                 Rectangle {
                   implicitHeight: 24
-                  implicitWidth: chipPresetText.implicitWidth + 14
+                  implicitWidth: chipPresetText.implicitWidth + 16
                   radius: 12
-                  color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.05)
-                  border.color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.12)
+                  color: presetHover.containsMouse ? Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.15) : Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.05)
+                  border.color: presetHover.containsMouse ? Color.accent : Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.12)
                   border.width: 1
 
                   MouseArea {
+                    id: presetHover
                     anchors.fill: parent
+                    hoverEnabled: true
                     cursorShape: Qt.PointingHandCursor
                     onClicked: {
                       createDescInput.text = modelData
@@ -2852,7 +2869,8 @@ Item {
                     anchors.centerIn: parent
                     text: modelData
                     font.pixelSize: 10
-                    color: Color.muted
+                    font.weight: Font.Medium
+                    color: presetHover.containsMouse ? Color.accent : Color.muted
                   }
                 }
               }
@@ -2865,53 +2883,77 @@ Item {
               radius: 8
               color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.04)
               border.color: createDescInput.activeFocus ? Color.accent : Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.15)
-              border.width: 1
+              border.width: createDescInput.activeFocus ? 1.5 : 1
 
-              TextInput {
-                id: createDescInput
+              RowLayout {
                 anchors.fill: parent
-                anchors.margins: 10
-                font.pixelSize: 12
-                color: Color.foreground
-                text: root.newSnapshotDesc
-                onTextChanged: root.newSnapshotDesc = text
-                focus: root.showCreateModal
-                onAccepted: {
-                  root.submitCreateSnapshot()
-                  keyCatcher.forceActiveFocus()
-                }
-                Keys.onReturnPressed: {
-                  root.submitCreateSnapshot()
-                  keyCatcher.forceActiveFocus()
-                }
-                Keys.onEnterPressed: {
-                  root.submitCreateSnapshot()
-                  keyCatcher.forceActiveFocus()
-                }
-                Keys.onEscapePressed: {
-                  root.showCreateModal = false
-                  keyCatcher.forceActiveFocus()
+                anchors.leftMargin: 10
+                anchors.rightMargin: 10
+                spacing: 8
+
+                TextInput {
+                  id: createDescInput
+                  Layout.fillWidth: true
+                  Layout.alignment: Qt.AlignVCenter
+                  font.pixelSize: 12
+                  color: Color.foreground
+                  text: root.newSnapshotDesc
+                  onTextChanged: root.newSnapshotDesc = text
+                  focus: root.showCreateModal
+                  onAccepted: {
+                    root.submitCreateSnapshot()
+                    keyCatcher.forceActiveFocus()
+                  }
+                  Keys.onReturnPressed: {
+                    root.submitCreateSnapshot()
+                    keyCatcher.forceActiveFocus()
+                  }
+                  Keys.onEnterPressed: {
+                    root.submitCreateSnapshot()
+                    keyCatcher.forceActiveFocus()
+                  }
+                  Keys.onEscapePressed: {
+                    root.showCreateModal = false
+                    keyCatcher.forceActiveFocus()
+                  }
+
+                  Text {
+                    anchors.fill: parent
+                    text: "Enter checkpoint label (e.g., Before Hyprland tweak)..."
+                    font.pixelSize: 12
+                    color: Color.muted
+                    visible: !parent.text && !parent.activeFocus
+                  }
                 }
 
+                // Clear button if text exists
                 Text {
-                  anchors.fill: parent
-                  text: "Enter checkpoint label (e.g., Before Hyprland tweak)..."
-                  font.pixelSize: 12
+                  visible: createDescInput.text.length > 0
+                  text: "󰅖"
+                  font.pixelSize: 11
                   color: Color.muted
-                  visible: !parent.text && !parent.activeFocus
+                  MouseArea {
+                    anchors.fill: parent
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: {
+                      createDescInput.text = ""
+                      root.newSnapshotDesc = ""
+                      createDescInput.forceActiveFocus()
+                    }
+                  }
                 }
               }
             }
 
             // Pin / Protect Checkbox
             RowLayout {
-              spacing: 8
+              spacing: 10
               Rectangle {
-                width: 18
-                height: 18
-                radius: 4
-                color: root.newSnapshotImportant ? Color.accent : Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.06)
-                border.color: root.newSnapshotImportant ? Color.accent : Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.2)
+                width: 20
+                height: 20
+                radius: 5
+                color: root.newSnapshotImportant ? Qt.rgba(0.99, 0.82, 0.20, 0.25) : Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.05)
+                border.color: root.newSnapshotImportant ? "#FDE047" : Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.18)
                 border.width: 1
 
                 MouseArea {
@@ -2924,16 +2966,25 @@ Item {
                   visible: root.newSnapshotImportant
                   anchors.centerIn: parent
                   text: "✓"
-                  font.pixelSize: 11
+                  font.pixelSize: 12
                   font.weight: Font.Bold
-                  color: Color.background
+                  color: "#FDE047"
                 }
               }
 
-              Text {
-                text: "Pin checkpoint (protect permanently from automatic retention pruning)"
-                font.pixelSize: 11
-                color: Color.foreground
+              RowLayout {
+                spacing: 6
+                Text {
+                  text: "󰤱"
+                  font.pixelSize: 13
+                  color: root.newSnapshotImportant ? "#FDE047" : Color.muted
+                }
+                Text {
+                  text: "Pin checkpoint (protect permanently from automatic retention pruning)"
+                  font.pixelSize: 11
+                  font.weight: root.newSnapshotImportant ? Font.DemiBold : Font.Normal
+                  color: root.newSnapshotImportant ? "#FDE047" : Color.foreground
+                }
               }
             }
 
@@ -2944,26 +2995,49 @@ Item {
               Item { Layout.fillWidth: true }
 
               Rectangle {
-                implicitHeight: 34
-                implicitWidth: 80
+                implicitHeight: 32
+                implicitWidth: createCancelLayout.implicitWidth + 20
                 radius: 6
-                color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.08)
+                color: createCancelHover.containsMouse ? Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.1) : Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.05)
+                border.color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.12)
+                border.width: 1
+
                 MouseArea {
+                  id: createCancelHover
                   anchors.fill: parent
+                  hoverEnabled: true
                   cursorShape: Qt.PointingHandCursor
                   onClicked: root.showCreateModal = false
                 }
-                Text {
+                RowLayout {
+                  id: createCancelLayout
                   anchors.centerIn: parent
-                  text: "Cancel"
-                  font.pixelSize: 12
-                  color: Color.muted
+                  spacing: 6
+                  Text {
+                    text: "Cancel"
+                    font.pixelSize: 11
+                    color: Color.muted
+                  }
+                  Rectangle {
+                    implicitHeight: 16
+                    implicitWidth: createEscTxt.implicitWidth + 6
+                    radius: 3
+                    color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.08)
+                    Text {
+                      id: createEscTxt
+                      anchors.centerIn: parent
+                      text: "Esc"
+                      font.pixelSize: 8
+                      font.weight: Font.Bold
+                      color: Color.muted
+                    }
+                  }
                 }
               }
 
               Rectangle {
-                implicitHeight: 34
-                implicitWidth: 140
+                implicitHeight: 32
+                implicitWidth: createSubmitLayout.implicitWidth + 22
                 radius: 6
                 color: Color.accent
                 MouseArea {
@@ -2971,12 +3045,30 @@ Item {
                   cursorShape: Qt.PointingHandCursor
                   onClicked: root.submitCreateSnapshot()
                 }
-                Text {
+                RowLayout {
+                  id: createSubmitLayout
                   anchors.centerIn: parent
-                  text: "Create Checkpoint"
-                  font.pixelSize: 12
-                  font.weight: Font.Bold
-                  color: Color.background
+                  spacing: 6
+                  Text {
+                    text: "Create Checkpoint"
+                    font.pixelSize: 11
+                    font.weight: Font.Bold
+                    color: Color.background
+                  }
+                  Rectangle {
+                    implicitHeight: 16
+                    implicitWidth: createEnterTxt.implicitWidth + 6
+                    radius: 3
+                    color: Qt.rgba(Color.background.r, Color.background.g, Color.background.b, 0.25)
+                    Text {
+                      id: createEnterTxt
+                      anchors.centerIn: parent
+                      text: "↵ Enter"
+                      font.pixelSize: 8
+                      font.weight: Font.Bold
+                      color: Color.background
+                    }
+                  }
                 }
               }
             }
@@ -2990,7 +3082,7 @@ Item {
       Rectangle {
         visible: root.showDiffModal
         anchors.fill: parent
-        color: Qt.rgba(0, 0, 0, 0.7)
+        color: Qt.rgba(0, 0, 0, 0.68)
 
         MouseArea {
           anchors.fill: parent
@@ -3000,12 +3092,12 @@ Item {
         Rectangle {
           id: diffModalCard
           anchors.centerIn: parent
-          width: 760
-          height: 540
+          width: 780
+          height: 560
           radius: 12
           color: Color.background
-          border.color: Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.4)
-          border.width: 1
+          border.color: Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.35)
+          border.width: 1.5
           focus: root.showDiffModal
 
           property string diffTab: "files" // "files" or "packages"
@@ -3028,6 +3120,12 @@ Item {
 
             RowLayout {
               Layout.fillWidth: true
+              spacing: 8
+              Text {
+                text: "󰙅"
+                font.pixelSize: 18
+                color: Color.accent
+              }
               Text {
                 text: "Changes in Snapshot #" + root.activeDiffSnapshotId + " vs Current System"
                 font.pixelSize: 16
@@ -3035,14 +3133,23 @@ Item {
                 color: Color.foreground
               }
               Item { Layout.fillWidth: true }
-              Text {
-                text: "󰅖"
-                font.pixelSize: 14
-                color: Color.muted
+              Rectangle {
+                implicitWidth: 26
+                implicitHeight: 26
+                radius: 6
+                color: diffCloseHover.containsMouse ? Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.08) : "transparent"
                 MouseArea {
+                  id: diffCloseHover
                   anchors.fill: parent
+                  hoverEnabled: true
                   cursorShape: Qt.PointingHandCursor
                   onClicked: root.showDiffModal = false
+                }
+                Text {
+                  anchors.centerIn: parent
+                  text: "󰅖"
+                  font.pixelSize: 13
+                  color: diffCloseHover.containsMouse ? Color.foreground : Color.muted
                 }
               }
             }
@@ -3055,7 +3162,7 @@ Item {
                 implicitHeight: 28
                 implicitWidth: tabFilesRow.implicitWidth + 20
                 radius: 14
-                color: active ? Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.2) : Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.05)
+                color: active ? Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.22) : Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.05)
                 border.color: active ? Color.accent : Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.1)
                 border.width: 1
                 MouseArea {
@@ -3067,7 +3174,11 @@ Item {
                   id: tabFilesRow
                   anchors.centerIn: parent
                   spacing: 6
-                  Text { text: "📁"; font.pixelSize: 11 }
+                  Text {
+                    text: "󰈔"
+                    font.pixelSize: 12
+                    color: parent.parent.active ? Color.accent : Color.muted
+                  }
                   Text {
                     text: "File Changes (" + ((root.activeDiffData && root.activeDiffData.files) ? root.activeDiffData.files.length : 0) + ")"
                     font.pixelSize: 11
@@ -3083,7 +3194,7 @@ Item {
                 implicitHeight: 28
                 implicitWidth: tabPkgsRow.implicitWidth + 20
                 radius: 14
-                color: active ? Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.2) : Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.05)
+                color: active ? Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.22) : Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.05)
                 border.color: active ? Color.accent : Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.1)
                 border.width: 1
                 MouseArea {
@@ -3096,9 +3207,9 @@ Item {
                   anchors.centerIn: parent
                   spacing: 6
                   Text {
-                    text: (root.activeDiffData && root.activeDiffData.hasCriticalPackages) ? "󰒋" : "📦"
-                    font.pixelSize: 11
-                    color: (root.activeDiffData && root.activeDiffData.hasCriticalPackages) ? "#F59E0B" : Color.accent
+                    text: (root.activeDiffData && root.activeDiffData.hasCriticalPackages) ? "󰒋" : "󰏖"
+                    font.pixelSize: 12
+                    color: (root.activeDiffData && root.activeDiffData.hasCriticalPackages) ? "#F59E0B" : (parent.parent.active ? Color.accent : Color.muted)
                   }
                   Text {
                     text: "Package Updates (" + parent.parent.pkgCount + ")"
@@ -3126,10 +3237,29 @@ Item {
 
               Item { Layout.fillWidth: true }
 
-              Text {
-                text: "Tab: switch view"
-                font.pixelSize: 10
-                color: Color.muted
+              RowLayout {
+                spacing: 5
+                Rectangle {
+                  implicitHeight: 16
+                  implicitWidth: tabKeyTxt.implicitWidth + 8
+                  radius: 3
+                  color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.08)
+                  border.color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.15)
+                  border.width: 1
+                  Text {
+                    id: tabKeyTxt
+                    anchors.centerIn: parent
+                    text: "Tab"
+                    font.pixelSize: 8
+                    font.weight: Font.Bold
+                    color: Color.muted
+                  }
+                }
+                Text {
+                  text: "Switch View"
+                  font.pixelSize: 10
+                  color: Color.muted
+                }
               }
             }
 
@@ -3152,6 +3282,7 @@ Item {
                     anchors.centerIn: parent
                     text: "+" + (parent.parent.summary.added || 0) + " Added"
                     font.pixelSize: 10
+                    font.weight: Font.Medium
                     color: "#10B981"
                   }
                 }
@@ -3165,6 +3296,7 @@ Item {
                     anchors.centerIn: parent
                     text: "~" + (parent.parent.summary.modified || 0) + " Modified"
                     font.pixelSize: 10
+                    font.weight: Font.Medium
                     color: "#F59E0B"
                   }
                 }
@@ -3178,6 +3310,7 @@ Item {
                     anchors.centerIn: parent
                     text: "-" + (parent.parent.summary.deleted || 0) + " Deleted"
                     font.pixelSize: 10
+                    font.weight: Font.Medium
                     color: "#EF4444"
                   }
                 }
@@ -3201,28 +3334,57 @@ Item {
               implicitHeight: 32
               radius: 6
               color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.04)
-              border.color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.1)
+              border.color: diffFilterInput.activeFocus ? Color.accent : Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.1)
               border.width: 1
 
-              TextInput {
-                id: diffFilterInput
+              RowLayout {
                 anchors.fill: parent
-                anchors.margins: 8
-                font.pixelSize: 11
-                color: Color.foreground
-                onTextChanged: root.diffFilterQuery = text.trim().toLowerCase()
-                Keys.onEscapePressed: {
-                  if (text.length > 0) text = ""
-                  else root.showDiffModal = false
-                  keyCatcher.forceActiveFocus()
-                }
+                anchors.leftMargin: 8
+                anchors.rightMargin: 8
+                spacing: 6
 
                 Text {
-                  anchors.fill: parent
-                  text: diffModalCard.diffTab === "files" ? "Filter changed files (e.g. /etc or .conf)..." : "Filter packages (e.g. linux, hyprland, mesa)..."
+                  text: "󰍉"
+                  font.pixelSize: 12
+                  color: diffFilterInput.activeFocus ? Color.accent : Color.muted
+                }
+
+                TextInput {
+                  id: diffFilterInput
+                  Layout.fillWidth: true
+                  Layout.alignment: Qt.AlignVCenter
+                  font.pixelSize: 11
+                  color: Color.foreground
+                  onTextChanged: root.diffFilterQuery = text.trim().toLowerCase()
+                  Keys.onEscapePressed: {
+                    if (text.length > 0) text = ""
+                    else root.showDiffModal = false
+                    keyCatcher.forceActiveFocus()
+                  }
+
+                  Text {
+                    anchors.fill: parent
+                    text: diffModalCard.diffTab === "files" ? "Filter changed files (e.g. /etc or .conf)..." : "Filter packages (e.g. linux, hyprland, mesa)..."
+                    font.pixelSize: 11
+                    color: Color.muted
+                    visible: !parent.text
+                  }
+                }
+
+                // Clear button
+                Text {
+                  visible: diffFilterInput.text.length > 0
+                  text: "󰅖"
                   font.pixelSize: 11
                   color: Color.muted
-                  visible: !parent.text
+                  MouseArea {
+                    anchors.fill: parent
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: {
+                      diffFilterInput.text = ""
+                      root.diffFilterQuery = ""
+                    }
+                  }
                 }
               }
             }
@@ -3365,7 +3527,7 @@ Item {
                   ColumnLayout {
                     anchors.centerIn: parent
                     spacing: 6
-                    Text { Layout.alignment: Qt.AlignHCenter; text: "📦"; font.pixelSize: 28 }
+                    Text { Layout.alignment: Qt.AlignHCenter; text: "󰏖"; font.pixelSize: 28; color: Color.muted }
                     Text {
                       Layout.alignment: Qt.AlignHCenter
                       text: (root.activeDiffData && root.activeDiffData.packageCount > 0) ? "No packages match filter." : "No package changes recorded for this snapshot."
@@ -3425,7 +3587,7 @@ Item {
                       RowLayout {
                         anchors.centerIn: parent
                         spacing: 3
-                        Text { text: "⚠"; font.pixelSize: 8 }
+                        Text { text: "󰒋"; font.pixelSize: 9; color: "#F59E0B" }
                         Text {
                           id: catTxt
                           text: modelData.criticalCategory || "Critical"
@@ -3459,7 +3621,7 @@ Item {
       Rectangle {
         visible: root.showRestoreModal
         anchors.fill: parent
-        color: Qt.rgba(0, 0, 0, 0.7)
+        color: Qt.rgba(0, 0, 0, 0.68)
 
         MouseArea {
           anchors.fill: parent
@@ -3469,12 +3631,12 @@ Item {
         Rectangle {
           id: restoreModalCard
           anchors.centerIn: parent
-          width: 500
+          width: 520
           implicitHeight: restoreCol.implicitHeight + 40
           radius: 12
           color: Color.background
-          border.color: "#10B981"
-          border.width: 1
+          border.color: Qt.rgba(0.06, 0.72, 0.51, 0.45)
+          border.width: 1.5
           focus: root.showRestoreModal
 
           Keys.onEscapePressed: {
@@ -3493,6 +3655,7 @@ Item {
             spacing: 14
 
             RowLayout {
+              Layout.fillWidth: true
               spacing: 10
               Text { text: "󰁯"; font.pixelSize: 22; color: "#10B981" }
               Text {
@@ -3500,6 +3663,26 @@ Item {
                 font.pixelSize: 16
                 font.weight: Font.Bold
                 color: Color.foreground
+              }
+              Item { Layout.fillWidth: true }
+              Rectangle {
+                implicitWidth: 26
+                implicitHeight: 26
+                radius: 6
+                color: resCloseHover.containsMouse ? Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.08) : "transparent"
+                MouseArea {
+                  id: resCloseHover
+                  anchors.fill: parent
+                  hoverEnabled: true
+                  cursorShape: Qt.PointingHandCursor
+                  onClicked: root.showRestoreModal = false
+                }
+                Text {
+                  anchors.centerIn: parent
+                  text: "󰅖"
+                  font.pixelSize: 13
+                  color: resCloseHover.containsMouse ? Color.foreground : Color.muted
+                }
               }
             }
 
@@ -3511,32 +3694,88 @@ Item {
               Layout.fillWidth: true
             }
 
+            // Safety Guarantee Callout Box
+            Rectangle {
+              Layout.fillWidth: true
+              implicitHeight: restoreSafeCol.implicitHeight + 16
+              radius: 6
+              color: Qt.rgba(0.06, 0.72, 0.51, 0.08)
+              border.color: Qt.rgba(0.06, 0.72, 0.51, 0.25)
+              border.width: 1
+
+              ColumnLayout {
+                id: restoreSafeCol
+                anchors.fill: parent
+                anchors.margins: 10
+                spacing: 4
+                RowLayout {
+                  spacing: 6
+                  Text { text: "󰞌"; font.pixelSize: 13; color: "#10B981" }
+                  Text {
+                    text: "Safety Guarantee: Non-Destructive Rollback"
+                    font.pixelSize: 11
+                    font.weight: Font.Bold
+                    color: "#10B981"
+                  }
+                }
+                Text {
+                  text: "The current system state is automatically captured into a pre-restore backup snapshot before applying changes. You can always boot back into your existing setup via Limine if needed."
+                  font.pixelSize: 10
+                  color: Color.muted
+                  wrapMode: Text.WordWrap
+                  Layout.fillWidth: true
+                }
+              }
+            }
+
             RowLayout {
               Layout.fillWidth: true
               spacing: 10
               Item { Layout.fillWidth: true }
 
               Rectangle {
-                implicitHeight: 34
-                implicitWidth: 80
+                implicitHeight: 32
+                implicitWidth: resCancelLayout.implicitWidth + 20
                 radius: 6
-                color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.08)
+                color: resCancelHover.containsMouse ? Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.1) : Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.05)
+                border.color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.12)
+                border.width: 1
                 MouseArea {
+                  id: resCancelHover
                   anchors.fill: parent
+                  hoverEnabled: true
                   cursorShape: Qt.PointingHandCursor
                   onClicked: root.showRestoreModal = false
                 }
-                Text {
+                RowLayout {
+                  id: resCancelLayout
                   anchors.centerIn: parent
-                  text: "Cancel"
-                  font.pixelSize: 12
-                  color: Color.muted
+                  spacing: 6
+                  Text {
+                    text: "Cancel"
+                    font.pixelSize: 11
+                    color: Color.muted
+                  }
+                  Rectangle {
+                    implicitHeight: 16
+                    implicitWidth: resEscTxt.implicitWidth + 6
+                    radius: 3
+                    color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.08)
+                    Text {
+                      id: resEscTxt
+                      anchors.centerIn: parent
+                      text: "Esc"
+                      font.pixelSize: 8
+                      font.weight: Font.Bold
+                      color: Color.muted
+                    }
+                  }
                 }
               }
 
               Rectangle {
-                implicitHeight: 34
-                implicitWidth: 150
+                implicitHeight: 32
+                implicitWidth: resSubmitLayout.implicitWidth + 22
                 radius: 6
                 color: "#10B981"
                 MouseArea {
@@ -3544,12 +3783,30 @@ Item {
                   cursorShape: Qt.PointingHandCursor
                   onClicked: root.executeRestore()
                 }
-                Text {
+                RowLayout {
+                  id: resSubmitLayout
                   anchors.centerIn: parent
-                  text: "Proceed to Restore"
-                  font.pixelSize: 12
-                  font.weight: Font.Bold
-                  color: "#181825"
+                  spacing: 6
+                  Text {
+                    text: "Proceed to Restore"
+                    font.pixelSize: 11
+                    font.weight: Font.Bold
+                    color: "#ffffff"
+                  }
+                  Rectangle {
+                    implicitHeight: 16
+                    implicitWidth: resEnterTxt.implicitWidth + 6
+                    radius: 3
+                    color: Qt.rgba(0, 0, 0, 0.2)
+                    Text {
+                      id: resEnterTxt
+                      anchors.centerIn: parent
+                      text: "↵ Enter"
+                      font.pixelSize: 8
+                      font.weight: Font.Bold
+                      color: "#ffffff"
+                    }
+                  }
                 }
               }
             }
@@ -3563,7 +3820,7 @@ Item {
       Rectangle {
         visible: root.showDeleteModal
         anchors.fill: parent
-        color: Qt.rgba(0, 0, 0, 0.7)
+        color: Qt.rgba(0, 0, 0, 0.68)
 
         MouseArea {
           anchors.fill: parent
@@ -3573,12 +3830,12 @@ Item {
         Rectangle {
           id: deleteModalCard
           anchors.centerIn: parent
-          width: 440
+          width: 480
           implicitHeight: deleteCol.implicitHeight + 40
           radius: 12
           color: Color.background
-          border.color: Color.urgent
-          border.width: 1
+          border.color: Qt.rgba(Color.urgent.r, Color.urgent.g, Color.urgent.b, 0.55)
+          border.width: 1.5
           focus: root.showDeleteModal
 
           Keys.onEscapePressed: {
@@ -3597,6 +3854,7 @@ Item {
             spacing: 14
 
             RowLayout {
+              Layout.fillWidth: true
               spacing: 10
               Text { text: "󰆴"; font.pixelSize: 22; color: Color.urgent }
               Text {
@@ -3604,6 +3862,26 @@ Item {
                 font.pixelSize: 16
                 font.weight: Font.Bold
                 color: Color.foreground
+              }
+              Item { Layout.fillWidth: true }
+              Rectangle {
+                implicitWidth: 26
+                implicitHeight: 26
+                radius: 6
+                color: delCloseHover.containsMouse ? Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.08) : "transparent"
+                MouseArea {
+                  id: delCloseHover
+                  anchors.fill: parent
+                  hoverEnabled: true
+                  cursorShape: Qt.PointingHandCursor
+                  onClicked: root.showDeleteModal = false
+                }
+                Text {
+                  anchors.centerIn: parent
+                  text: "󰅖"
+                  font.pixelSize: 13
+                  color: delCloseHover.containsMouse ? Color.foreground : Color.muted
+                }
               }
             }
 
@@ -3615,32 +3893,88 @@ Item {
               Layout.fillWidth: true
             }
 
+            // Irreversible Deletion Warning Box
+            Rectangle {
+              Layout.fillWidth: true
+              implicitHeight: delWarnCol.implicitHeight + 16
+              radius: 6
+              color: Qt.rgba(Color.urgent.r, Color.urgent.g, Color.urgent.b, 0.08)
+              border.color: Qt.rgba(Color.urgent.r, Color.urgent.g, Color.urgent.b, 0.25)
+              border.width: 1
+
+              ColumnLayout {
+                id: delWarnCol
+                anchors.fill: parent
+                anchors.margins: 10
+                spacing: 4
+                RowLayout {
+                  spacing: 6
+                  Text { text: "󰅚"; font.pixelSize: 13; color: Color.urgent }
+                  Text {
+                    text: "Irreversible Action Safeguard"
+                    font.pixelSize: 11
+                    font.weight: Font.Bold
+                    color: Color.urgent
+                  }
+                }
+                Text {
+                  text: "The underlying subvolume data will be permanently freed from disk. This snapshot cannot be recovered after deletion."
+                  font.pixelSize: 10
+                  color: Color.muted
+                  wrapMode: Text.WordWrap
+                  Layout.fillWidth: true
+                }
+              }
+            }
+
             RowLayout {
               Layout.fillWidth: true
               spacing: 10
               Item { Layout.fillWidth: true }
 
               Rectangle {
-                implicitHeight: 34
-                implicitWidth: 80
+                implicitHeight: 32
+                implicitWidth: delCancelLayout.implicitWidth + 20
                 radius: 6
-                color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.08)
+                color: delCancelHover.containsMouse ? Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.1) : Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.05)
+                border.color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.12)
+                border.width: 1
                 MouseArea {
+                  id: delCancelHover
                   anchors.fill: parent
+                  hoverEnabled: true
                   cursorShape: Qt.PointingHandCursor
                   onClicked: root.showDeleteModal = false
                 }
-                Text {
+                RowLayout {
+                  id: delCancelLayout
                   anchors.centerIn: parent
-                  text: "Cancel"
-                  font.pixelSize: 12
-                  color: Color.muted
+                  spacing: 6
+                  Text {
+                    text: "Cancel"
+                    font.pixelSize: 11
+                    color: Color.muted
+                  }
+                  Rectangle {
+                    implicitHeight: 16
+                    implicitWidth: delEscTxt.implicitWidth + 6
+                    radius: 3
+                    color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.08)
+                    Text {
+                      id: delEscTxt
+                      anchors.centerIn: parent
+                      text: "Esc"
+                      font.pixelSize: 8
+                      font.weight: Font.Bold
+                      color: Color.muted
+                    }
+                  }
                 }
               }
 
               Rectangle {
-                implicitHeight: 34
-                implicitWidth: 120
+                implicitHeight: 32
+                implicitWidth: delSubmitLayout.implicitWidth + 22
                 radius: 6
                 color: Color.urgent
                 MouseArea {
@@ -3648,12 +3982,30 @@ Item {
                   cursorShape: Qt.PointingHandCursor
                   onClicked: root.executeDelete()
                 }
-                Text {
+                RowLayout {
+                  id: delSubmitLayout
                   anchors.centerIn: parent
-                  text: "Delete"
-                  font.pixelSize: 12
-                  font.weight: Font.Bold
-                  color: Color.background
+                  spacing: 6
+                  Text {
+                    text: "Delete Snapshot"
+                    font.pixelSize: 11
+                    font.weight: Font.Bold
+                    color: "#ffffff"
+                  }
+                  Rectangle {
+                    implicitHeight: 16
+                    implicitWidth: delEnterTxt.implicitWidth + 6
+                    radius: 3
+                    color: Qt.rgba(0, 0, 0, 0.25)
+                    Text {
+                      id: delEnterTxt
+                      anchors.centerIn: parent
+                      text: "↵ Enter"
+                      font.pixelSize: 8
+                      font.weight: Font.Bold
+                      color: "#ffffff"
+                    }
+                  }
                 }
               }
             }
@@ -3667,7 +4019,7 @@ Item {
       Rectangle {
         visible: root.showRestoreFileModal
         anchors.fill: parent
-        color: Qt.rgba(0, 0, 0, 0.7)
+        color: Qt.rgba(0, 0, 0, 0.68)
 
         MouseArea {
           anchors.fill: parent
@@ -3681,8 +4033,8 @@ Item {
           implicitHeight: restoreFileCol.implicitHeight + 40
           radius: 12
           color: Color.background
-          border.color: "#10B981"
-          border.width: 1
+          border.color: Qt.rgba(0.06, 0.72, 0.51, 0.45)
+          border.width: 1.5
           focus: root.showRestoreFileModal
 
           Keys.onEscapePressed: {
@@ -3701,6 +4053,7 @@ Item {
             spacing: 14
 
             RowLayout {
+              Layout.fillWidth: true
               spacing: 10
               Text { text: "󰁌"; font.pixelSize: 22; color: "#10B981" }
               Text {
@@ -3708,6 +4061,26 @@ Item {
                 font.pixelSize: 16
                 font.weight: Font.Bold
                 color: Color.foreground
+              }
+              Item { Layout.fillWidth: true }
+              Rectangle {
+                implicitWidth: 26
+                implicitHeight: 26
+                radius: 6
+                color: resFileCloseHover.containsMouse ? Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.08) : "transparent"
+                MouseArea {
+                  id: resFileCloseHover
+                  anchors.fill: parent
+                  hoverEnabled: true
+                  cursorShape: Qt.PointingHandCursor
+                  onClicked: root.showRestoreFileModal = false
+                }
+                Text {
+                  anchors.centerIn: parent
+                  text: "󰅖"
+                  font.pixelSize: 13
+                  color: resFileCloseHover.containsMouse ? Color.foreground : Color.muted
+                }
               }
             }
 
@@ -3731,7 +4104,7 @@ Item {
                 anchors.fill: parent
                 anchors.margins: 8
                 spacing: 8
-                Text { text: "📄"; font.pixelSize: 14 }
+                Text { text: "󰈔"; font.pixelSize: 14; color: Color.accent }
                 Text {
                   text: root.activeRestoreFilePath
                   font.pixelSize: 12
@@ -3744,7 +4117,7 @@ Item {
               }
             }
 
-            // Safety Guarantee pill
+            // Safety Guarantee Callout Box
             Rectangle {
               Layout.fillWidth: true
               implicitHeight: safetyCol.implicitHeight + 16
@@ -3761,7 +4134,7 @@ Item {
 
                 RowLayout {
                   spacing: 6
-                  Text { text: "🛡️"; font.pixelSize: 12 }
+                  Text { text: "󰞌"; font.pixelSize: 13; color: "#10B981" }
                   Text {
                     text: "Safety Guarantee: Automatic Backup"
                     font.pixelSize: 11
@@ -3785,26 +4158,48 @@ Item {
               Item { Layout.fillWidth: true }
 
               Rectangle {
-                implicitHeight: 34
-                implicitWidth: 80
+                implicitHeight: 32
+                implicitWidth: resFileCancelLayout.implicitWidth + 20
                 radius: 6
-                color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.08)
+                color: resFileCancelHover.containsMouse ? Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.1) : Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.05)
+                border.color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.12)
+                border.width: 1
                 MouseArea {
+                  id: resFileCancelHover
                   anchors.fill: parent
+                  hoverEnabled: true
                   cursorShape: Qt.PointingHandCursor
                   onClicked: root.showRestoreFileModal = false
                 }
-                Text {
+                RowLayout {
+                  id: resFileCancelLayout
                   anchors.centerIn: parent
-                  text: "Cancel"
-                  font.pixelSize: 12
-                  color: Color.muted
+                  spacing: 6
+                  Text {
+                    text: "Cancel"
+                    font.pixelSize: 11
+                    color: Color.muted
+                  }
+                  Rectangle {
+                    implicitHeight: 16
+                    implicitWidth: resFileEscTxt.implicitWidth + 6
+                    radius: 3
+                    color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.08)
+                    Text {
+                      id: resFileEscTxt
+                      anchors.centerIn: parent
+                      text: "Esc"
+                      font.pixelSize: 8
+                      font.weight: Font.Bold
+                      color: Color.muted
+                    }
+                  }
                 }
               }
 
               Rectangle {
-                implicitHeight: 34
-                implicitWidth: 150
+                implicitHeight: 32
+                implicitWidth: resFileSubmitLayout.implicitWidth + 22
                 radius: 6
                 color: "#10B981"
                 MouseArea {
@@ -3812,12 +4207,30 @@ Item {
                   cursorShape: Qt.PointingHandCursor
                   onClicked: root.executeRestoreFile()
                 }
-                Text {
+                RowLayout {
+                  id: resFileSubmitLayout
                   anchors.centerIn: parent
-                  text: "Restore File"
-                  font.pixelSize: 12
-                  font.weight: Font.Bold
-                  color: "#181825"
+                  spacing: 6
+                  Text {
+                    text: "Restore File"
+                    font.pixelSize: 11
+                    font.weight: Font.Bold
+                    color: "#ffffff"
+                  }
+                  Rectangle {
+                    implicitHeight: 16
+                    implicitWidth: resFileEnterTxt.implicitWidth + 6
+                    radius: 3
+                    color: Qt.rgba(0, 0, 0, 0.2)
+                    Text {
+                      id: resFileEnterTxt
+                      anchors.centerIn: parent
+                      text: "↵ Enter"
+                      font.pixelSize: 8
+                      font.weight: Font.Bold
+                      color: "#ffffff"
+                    }
+                  }
                 }
               }
             }
@@ -3831,7 +4244,7 @@ Item {
       Rectangle {
         visible: root.showOptimizeModal
         anchors.fill: parent
-        color: Qt.rgba(0, 0, 0, 0.75)
+        color: Qt.rgba(0, 0, 0, 0.68)
 
         MouseArea {
           anchors.fill: parent
@@ -3843,12 +4256,12 @@ Item {
         Rectangle {
           id: optimizeModalCard
           anchors.centerIn: parent
-          width: 580
+          width: 600
           implicitHeight: Math.min(540, optimizeCol.implicitHeight + 40)
           radius: 12
           color: Color.background
-          border.color: "#10B981"
-          border.width: 1
+          border.color: Qt.rgba(0.06, 0.72, 0.51, 0.45)
+          border.width: 1.5
           focus: root.showOptimizeModal
 
           Keys.onEscapePressed: {
@@ -3876,8 +4289,9 @@ Item {
             anchors.margins: 20
             spacing: 14
 
-            // Title & Icon
+            // Title & Icon + Close
             RowLayout {
+              Layout.fillWidth: true
               spacing: 10
               Text { text: "󰚰"; font.pixelSize: 22; color: "#10B981" }
               ColumnLayout {
@@ -3892,6 +4306,28 @@ Item {
                   text: (root.activeOptimizeData && root.activeOptimizeData.retentionPolicy) || "Analyzing retention guards and space reclamation..."
                   font.pixelSize: 11
                   color: Color.muted
+                }
+              }
+              Item { Layout.fillWidth: true }
+              Rectangle {
+                implicitWidth: 26
+                implicitHeight: 26
+                radius: 6
+                color: optCloseHover.containsMouse ? Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.08) : "transparent"
+                MouseArea {
+                  id: optCloseHover
+                  anchors.fill: parent
+                  hoverEnabled: true
+                  cursorShape: Qt.PointingHandCursor
+                  onClicked: {
+                    if (!root.isOptimizing) root.showOptimizeModal = false
+                  }
+                }
+                Text {
+                  anchors.centerIn: parent
+                  text: "󰅖"
+                  font.pixelSize: 13
+                  color: optCloseHover.containsMouse ? Color.foreground : Color.muted
                 }
               }
             }
@@ -3946,8 +4382,9 @@ Item {
                   }
                   Text {
                     anchors.horizontalCenter: parent.horizontalCenter
-                    text: "🛡️ Protected"
+                    text: "󰞌 Protected"
                     font.pixelSize: 9
+                    font.weight: Font.Medium
                     color: "#10B981"
                   }
                 }
@@ -3972,8 +4409,9 @@ Item {
                   }
                   Text {
                     anchors.horizontalCenter: parent.horizontalCenter
-                    text: "🧹 Prunable Stale"
+                    text: "󰆴 Prunable Stale"
                     font.pixelSize: 9
+                    font.weight: Font.Medium
                     color: "#F59E0B"
                   }
                 }
@@ -3998,7 +4436,7 @@ Item {
                   }
                   Text {
                     anchors.horizontalCenter: parent.horizontalCenter
-                    text: "💾 Est. Reclaim"
+                    text: "󰚰 Est. Reclaim"
                     font.pixelSize: 9
                     font.weight: Font.Bold
                     color: "#10B981"
@@ -4023,7 +4461,7 @@ Item {
                 spacing: 4
                 RowLayout {
                   spacing: 6
-                  Text { text: "🛡️"; font.pixelSize: 12 }
+                  Text { text: "󰞌"; font.pixelSize: 12; color: "#10B981" }
                   Text {
                     text: "Safe Retention Guard Active"
                     font.pixelSize: 11
@@ -4032,7 +4470,7 @@ Item {
                   }
                 }
                 Text {
-                  text: "Pinned checkpoints (📌), the newest system state, and recent recovery points are strictly locked against pruning. Only stale checkpoints outside retention limits will be reclaimed."
+                  text: "Pinned checkpoints (󰤱), the newest system state, and recent recovery points are strictly locked against pruning. Only stale checkpoints outside retention limits will be reclaimed."
                   font.pixelSize: 10
                   color: Color.muted
                   wrapMode: Text.WordWrap
@@ -4069,7 +4507,7 @@ Item {
                   ColumnLayout {
                     anchors.centerIn: parent
                     spacing: 4
-                    Text { Layout.alignment: Qt.AlignHCenter; text: "✔"; font.pixelSize: 22; color: "#10B981" }
+                    Text { Layout.alignment: Qt.AlignHCenter; text: "󰄬"; font.pixelSize: 22; color: "#10B981" }
                     Text {
                       Layout.alignment: Qt.AlignHCenter
                       text: "All recovery points are protected or recent. Storage is fully optimized!"
@@ -4138,28 +4576,50 @@ Item {
               Item { Layout.fillWidth: true }
 
               Rectangle {
-                implicitHeight: 34
-                implicitWidth: 80
+                implicitHeight: 32
+                implicitWidth: optCancelLayout.implicitWidth + 20
                 radius: 6
-                color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.08)
+                color: optCancelHover.containsMouse ? Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.1) : Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.05)
+                border.color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.12)
+                border.width: 1
                 MouseArea {
+                  id: optCancelHover
                   anchors.fill: parent
+                  hoverEnabled: true
                   cursorShape: Qt.PointingHandCursor
                   onClicked: {
                     if (!root.isOptimizing) root.showOptimizeModal = false
                   }
                 }
-                Text {
+                RowLayout {
+                  id: optCancelLayout
                   anchors.centerIn: parent
-                  text: "Cancel"
-                  font.pixelSize: 12
-                  color: Color.muted
+                  spacing: 6
+                  Text {
+                    text: "Cancel"
+                    font.pixelSize: 11
+                    color: Color.muted
+                  }
+                  Rectangle {
+                    implicitHeight: 16
+                    implicitWidth: optEscTxt.implicitWidth + 6
+                    radius: 3
+                    color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.08)
+                    Text {
+                      id: optEscTxt
+                      anchors.centerIn: parent
+                      text: "Esc"
+                      font.pixelSize: 8
+                      font.weight: Font.Bold
+                      color: Color.muted
+                    }
+                  }
                 }
               }
 
               Rectangle {
-                implicitHeight: 34
-                implicitWidth: 180
+                implicitHeight: 32
+                implicitWidth: optSubmitLayout.implicitWidth + 22
                 radius: 6
                 color: (root.activeOptimizeData && root.activeOptimizeData.prunableCount > 0 && !root.isOptimizing) ? "#10B981" : Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.1)
                 opacity: (root.activeOptimizeData && root.activeOptimizeData.prunableCount > 0 && !root.isOptimizing) ? 1.0 : 0.6
@@ -4175,20 +4635,36 @@ Item {
                 }
 
                 RowLayout {
+                  id: optSubmitLayout
                   anchors.centerIn: parent
                   spacing: 6
                   Text {
                     text: root.isOptimizing ? "󰑐" : "󰚰"
                     font.pixelSize: 13
-                    color: (root.activeOptimizeData && root.activeOptimizeData.prunableCount > 0 && !root.isOptimizing) ? "#181825" : Color.muted
+                    color: (root.activeOptimizeData && root.activeOptimizeData.prunableCount > 0 && !root.isOptimizing) ? "#ffffff" : Color.muted
                     rotation: root.isOptimizing ? 180 : 0
                     Behavior on rotation { NumberAnimation { duration: 400 } }
                   }
                   Text {
                     text: root.isOptimizing ? "Pruning Snapshots..." : "Clean & Reclaim Space"
-                    font.pixelSize: 12
+                    font.pixelSize: 11
                     font.weight: Font.Bold
-                    color: (root.activeOptimizeData && root.activeOptimizeData.prunableCount > 0 && !root.isOptimizing) ? "#181825" : Color.muted
+                    color: (root.activeOptimizeData && root.activeOptimizeData.prunableCount > 0 && !root.isOptimizing) ? "#ffffff" : Color.muted
+                  }
+                  Rectangle {
+                    visible: (root.activeOptimizeData && root.activeOptimizeData.prunableCount > 0 && !root.isOptimizing)
+                    implicitHeight: 16
+                    implicitWidth: optEnterTxt.implicitWidth + 6
+                    radius: 3
+                    color: Qt.rgba(0, 0, 0, 0.2)
+                    Text {
+                      id: optEnterTxt
+                      anchors.centerIn: parent
+                      text: "↵ Enter"
+                      font.pixelSize: 8
+                      font.weight: Font.Bold
+                      color: "#ffffff"
+                    }
                   }
                 }
               }
@@ -4203,7 +4679,7 @@ Item {
       Rectangle {
         visible: root.showBootModal
         anchors.fill: parent
-        color: Qt.rgba(0, 0, 0, 0.75)
+        color: Qt.rgba(0, 0, 0, 0.68)
 
         MouseArea {
           anchors.fill: parent
@@ -4215,12 +4691,12 @@ Item {
         Rectangle {
           id: bootModalCard
           anchors.centerIn: parent
-          width: 640
+          width: 660
           implicitHeight: Math.min(540, bootCol.implicitHeight + 40)
           radius: 12
           color: Color.background
-          border.color: "#10B981"
-          border.width: 1
+          border.color: Qt.rgba(0.06, 0.72, 0.51, 0.45)
+          border.width: 1.5
           focus: root.showBootModal
 
           Keys.onEscapePressed: {
@@ -4248,7 +4724,7 @@ Item {
             anchors.margins: 20
             spacing: 14
 
-            // Title & Icon + Health Badge
+            // Title & Icon + Health Badge + Close Button
             RowLayout {
               Layout.fillWidth: true
               spacing: 10
@@ -4296,6 +4772,29 @@ Item {
                     font.weight: Font.Bold
                     color: parent.parent.isHealthy ? "#10B981" : "#F59E0B"
                   }
+                }
+              }
+
+              // Close Button
+              Rectangle {
+                implicitWidth: 26
+                implicitHeight: 26
+                radius: 6
+                color: bootCloseHover.containsMouse ? Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.08) : "transparent"
+                MouseArea {
+                  id: bootCloseHover
+                  anchors.fill: parent
+                  hoverEnabled: true
+                  cursorShape: Qt.PointingHandCursor
+                  onClicked: {
+                    if (!root.isSyncingBoot) root.showBootModal = false
+                  }
+                }
+                Text {
+                  anchors.centerIn: parent
+                  text: "󰅖"
+                  font.pixelSize: 13
+                  color: bootCloseHover.containsMouse ? Color.foreground : Color.muted
                 }
               }
             }
@@ -4557,28 +5056,50 @@ Item {
               }
 
               Rectangle {
-                implicitHeight: 34
-                implicitWidth: 80
+                implicitHeight: 32
+                implicitWidth: bootCloseLayout.implicitWidth + 20
                 radius: 6
-                color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.08)
+                color: bootCloseBtnHover.containsMouse ? Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.1) : Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.05)
+                border.color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.12)
+                border.width: 1
                 MouseArea {
+                  id: bootCloseBtnHover
                   anchors.fill: parent
+                  hoverEnabled: true
                   cursorShape: Qt.PointingHandCursor
                   onClicked: {
                     if (!root.isSyncingBoot) root.showBootModal = false
                   }
                 }
-                Text {
+                RowLayout {
+                  id: bootCloseLayout
                   anchors.centerIn: parent
-                  text: "Close"
-                  font.pixelSize: 12
-                  color: Color.muted
+                  spacing: 6
+                  Text {
+                    text: "Close"
+                    font.pixelSize: 11
+                    color: Color.muted
+                  }
+                  Rectangle {
+                    implicitHeight: 16
+                    implicitWidth: bootEscTxt.implicitWidth + 6
+                    radius: 3
+                    color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.08)
+                    Text {
+                      id: bootEscTxt
+                      anchors.centerIn: parent
+                      text: "Esc"
+                      font.pixelSize: 8
+                      font.weight: Font.Bold
+                      color: Color.muted
+                    }
+                  }
                 }
               }
 
               Rectangle {
-                implicitHeight: 34
-                implicitWidth: 170
+                implicitHeight: 32
+                implicitWidth: bootSubmitLayout.implicitWidth + 22
                 radius: 6
                 color: root.isSyncingBoot ? Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.1) : "#10B981"
                 opacity: root.isSyncingBoot ? 0.6 : 1.0
@@ -4594,20 +5115,36 @@ Item {
                 }
 
                 RowLayout {
+                  id: bootSubmitLayout
                   anchors.centerIn: parent
                   spacing: 6
                   Text {
                     text: root.isSyncingBoot ? "󰑐" : "󰌢"
                     font.pixelSize: 13
-                    color: root.isSyncingBoot ? Color.muted : "#181825"
+                    color: root.isSyncingBoot ? Color.muted : "#ffffff"
                     rotation: root.isSyncingBoot ? 180 : 0
                     Behavior on rotation { NumberAnimation { duration: 400 } }
                   }
                   Text {
                     text: root.isSyncingBoot ? "Syncing Limine..." : "Sync Bootloader Now"
-                    font.pixelSize: 12
+                    font.pixelSize: 11
                     font.weight: Font.Bold
-                    color: root.isSyncingBoot ? Color.muted : "#181825"
+                    color: root.isSyncingBoot ? Color.muted : "#ffffff"
+                  }
+                  Rectangle {
+                    visible: !root.isSyncingBoot
+                    implicitHeight: 16
+                    implicitWidth: bootEnterTxt.implicitWidth + 6
+                    radius: 3
+                    color: Qt.rgba(0, 0, 0, 0.2)
+                    Text {
+                      id: bootEnterTxt
+                      anchors.centerIn: parent
+                      text: "↵ Enter"
+                      font.pixelSize: 8
+                      font.weight: Font.Bold
+                      color: "#ffffff"
+                    }
                   }
                 }
               }
