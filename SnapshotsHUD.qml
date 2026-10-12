@@ -1662,7 +1662,7 @@ Item {
                 { id: "all", label: "All Points (" + root.snapshotsList.length + ")", icon: "", key: "1" },
                 { id: "update", label: "Pre-Update", icon: "󰚰", key: "2" },
                 { id: "manual", label: "Manual", icon: "󰐕", key: "3" },
-                { id: "pinned", label: "Pinned", icon: "📌", key: "4" }
+                { id: "pinned", label: "Pinned", icon: "󰤱", key: "4" }
               ]
 
               Rectangle {
@@ -1699,6 +1699,7 @@ Item {
                     visible: modelData.icon.length > 0
                     text: modelData.icon
                     font.pixelSize: 12
+                    color: modelData.id === "pinned" ? "#FDE047" : (filterChipRect.selected ? Color.accent : Color.muted)
                   }
 
                   Text {
@@ -1976,8 +1977,9 @@ Item {
                         anchors.centerIn: parent
                         spacing: 4
                         Text {
-                          text: "📌"
+                          text: "󰤱"
                           font.pixelSize: 12
+                          color: "#FDE047"
                         }
                         Text {
                           text: "Pinned"
@@ -2186,9 +2188,9 @@ Item {
                       anchors.centerIn: parent
                       spacing: 5
                       Text {
-                        text: "📌"
-                        font.pixelSize: 12
-                        opacity: modelData.important ? 1.0 : 0.5
+                        text: modelData.important ? "󰤱" : "󰤲"
+                        font.pixelSize: 13
+                        color: modelData.important ? "#FDE047" : Color.muted
                       }
                       Rectangle {
                         implicitHeight: 16
@@ -2474,7 +2476,7 @@ Item {
                   border.width: 1
                   Text { id: keyTxt5; anchors.centerIn: parent; text: "P"; font.pixelSize: 9; font.weight: Font.Bold; color: "#FDE047" }
                 }
-                Text { text: "📌 Pin"; font.pixelSize: 10; font.weight: Font.Medium; color: "#FDE047" }
+                Text { text: "󰤱 Pin"; font.pixelSize: 10; font.weight: Font.Medium; color: "#FDE047" }
               }
             }
 
