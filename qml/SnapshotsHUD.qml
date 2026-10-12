@@ -1662,7 +1662,7 @@ Item {
                 { id: "all", label: "All Points (" + root.snapshotsList.length + ")", icon: "", key: "1" },
                 { id: "update", label: "Pre-Update", icon: "󰚰", key: "2" },
                 { id: "manual", label: "Manual", icon: "󰐕", key: "3" },
-                { id: "pinned", label: "Pinned", icon: "󰤱", key: "4" }
+                { id: "pinned", label: "Pinned", icon: "📌", key: "4" }
               ]
 
               Rectangle {
@@ -1672,10 +1672,10 @@ Item {
                 implicitWidth: chipRowLayout.implicitWidth + 20
                 radius: 8
                 color: selected 
-                  ? Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.22) 
+                  ? (modelData.id === "pinned" ? Qt.rgba(0.99, 0.82, 0.20, 0.24) : Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.22)) 
                   : (filterMouse.containsMouse ? Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.08) : Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.03))
                 border.color: selected 
-                  ? Color.accent 
+                  ? (modelData.id === "pinned" ? "#FDE047" : Color.accent) 
                   : (filterMouse.containsMouse ? Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.18) : Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.10))
                 border.width: 1
 
@@ -1699,7 +1699,6 @@ Item {
                     visible: modelData.icon.length > 0
                     text: modelData.icon
                     font.pixelSize: 12
-                    color: modelData.id === "pinned" ? "#ffffff" : (filterChipRect.selected ? Color.accent : Color.muted)
                   }
 
                   Text {
@@ -1707,7 +1706,9 @@ Item {
                     text: modelData.label
                     font.pixelSize: 11
                     font.weight: filterChipRect.selected ? Font.DemiBold : Font.Normal
-                    color: filterChipRect.selected ? Color.accent : Color.muted
+                    color: filterChipRect.selected 
+                      ? (modelData.id === "pinned" ? "#FDE047" : Color.accent) 
+                      : (modelData.id === "pinned" ? "#FDE047" : Color.muted)
                   }
 
                   Rectangle {
@@ -1715,10 +1716,10 @@ Item {
                     implicitWidth: Math.max(16, chipKeyText.implicitWidth + 6)
                     radius: 3
                     color: filterChipRect.selected 
-                      ? Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.35) 
+                      ? (modelData.id === "pinned" ? Qt.rgba(0.99, 0.82, 0.20, 0.35) : Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.35)) 
                       : Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.08)
                     border.color: filterChipRect.selected 
-                      ? Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.5) 
+                      ? (modelData.id === "pinned" ? "#FDE047" : Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.5)) 
                       : Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.15)
                     border.width: 1
 
@@ -1728,7 +1729,9 @@ Item {
                       text: modelData.key
                       font.pixelSize: 9
                       font.weight: Font.Bold
-                      color: filterChipRect.selected ? Color.accent : Color.muted
+                      color: filterChipRect.selected 
+                        ? (modelData.id === "pinned" ? "#FDE047" : Color.accent) 
+                        : (modelData.id === "pinned" ? "#FDE047" : Color.muted)
                     }
                   }
                 }
@@ -1921,8 +1924,8 @@ Item {
                   width: 44
                   height: 44
                   radius: 8
-                  color: modelData.important ? Qt.rgba(0.96, 0.62, 0.04, 0.15) : Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.1)
-                  border.color: modelData.important ? "#F59E0B" : Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.25)
+                  color: modelData.important ? Qt.rgba(0.99, 0.82, 0.20, 0.22) : Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.1)
+                  border.color: modelData.important ? "#FDE047" : Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.25)
                   border.width: 1
 
                   ColumnLayout {
@@ -1933,13 +1936,13 @@ Item {
                       text: "#" + modelData.id
                       font.pixelSize: 13
                       font.weight: Font.Bold
-                      color: modelData.important ? "#F59E0B" : Color.accent
+                      color: modelData.important ? "#FDE047" : Color.accent
                     }
                     Text {
                       Layout.alignment: Qt.AlignHCenter
                       text: modelData.cleanup === "none" ? "keep" : "auto"
                       font.pixelSize: 9
-                      color: Color.muted
+                      color: modelData.important ? "#FDE047" : Color.muted
                     }
                   }
                 }
@@ -1961,11 +1964,11 @@ Item {
                     // Pinned Chip
                     Rectangle {
                       visible: modelData.important === true
-                      implicitHeight: 18
-                      implicitWidth: pinChipRow.implicitWidth + 12
-                      radius: 9
-                      color: Qt.rgba(0.96, 0.62, 0.15, 0.22)
-                      border.color: Qt.rgba(0.96, 0.62, 0.15, 0.40)
+                      implicitHeight: 20
+                      implicitWidth: pinChipRow.implicitWidth + 14
+                      radius: 10
+                      color: Qt.rgba(0.99, 0.82, 0.20, 0.25)
+                      border.color: "#FDE047"
                       border.width: 1
 
                       RowLayout {
@@ -1973,15 +1976,14 @@ Item {
                         anchors.centerIn: parent
                         spacing: 4
                         Text {
-                          text: "󰤱"
-                          font.pixelSize: 11
-                          color: "#ffffff"
+                          text: "📌"
+                          font.pixelSize: 12
                         }
                         Text {
                           text: "Pinned"
-                          font.pixelSize: 9
+                          font.pixelSize: 10
                           font.weight: Font.Bold
-                          color: "#ffffff"
+                          color: "#FDE047"
                         }
                       }
                     }
@@ -2159,10 +2161,12 @@ Item {
                   // Pin / Unpin Button
                   Rectangle {
                     implicitHeight: 28
-                    implicitWidth: pinBtnLayout.implicitWidth + 12
+                    implicitWidth: pinBtnLayout.implicitWidth + 14
                     radius: 6
-                    color: pinHover.containsMouse ? Qt.rgba(0.96, 0.62, 0.04, 0.2) : Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.04)
-                    border.color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.1)
+                    color: modelData.important 
+                      ? (pinHover.containsMouse ? Qt.rgba(0.99, 0.82, 0.20, 0.35) : Qt.rgba(0.99, 0.82, 0.20, 0.22))
+                      : (pinHover.containsMouse ? Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.10) : Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.04))
+                    border.color: modelData.important ? "#FDE047" : Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.12)
                     border.width: 1
 
                     MouseArea {
@@ -2180,18 +2184,18 @@ Item {
                     RowLayout {
                       id: pinBtnLayout
                       anchors.centerIn: parent
-                      spacing: 4
+                      spacing: 5
                       Text {
-                        text: modelData.important ? "󰤱" : "󰤲"
+                        text: "📌"
                         font.pixelSize: 12
-                        color: modelData.important ? "#ffffff" : Color.muted
+                        opacity: modelData.important ? 1.0 : 0.5
                       }
                       Rectangle {
-                        implicitHeight: 15
+                        implicitHeight: 16
                         implicitWidth: pinKeyTxt.implicitWidth + 6
                         radius: 3
-                        color: modelData.important ? Qt.rgba(1, 1, 1, 0.22) : Qt.rgba(0.96, 0.62, 0.04, 0.2)
-                        border.color: modelData.important ? Qt.rgba(1, 1, 1, 0.4) : "transparent"
+                        color: modelData.important ? Qt.rgba(0.99, 0.82, 0.20, 0.35) : Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.1)
+                        border.color: modelData.important ? "#FDE047" : "transparent"
                         border.width: modelData.important ? 1 : 0
                         Text {
                           id: pinKeyTxt
@@ -2199,7 +2203,7 @@ Item {
                           text: "P"
                           font.pixelSize: 8
                           font.weight: Font.Bold
-                          color: modelData.important ? "#ffffff" : Color.muted
+                          color: modelData.important ? "#FDE047" : Color.muted
                         }
                       }
                     }
@@ -2441,12 +2445,12 @@ Item {
               }
             }
 
-            // Hint: Pin (Sharp #ffffff vector pin)
+            // Hint: Pin (Bright luminous yellow/gold with 📌)
             Rectangle {
               implicitHeight: 24
               implicitWidth: h5Layout.implicitWidth + 10
               radius: 5
-              color: h5Mouse.containsMouse ? Qt.rgba(1, 1, 1, 0.12) : "transparent"
+              color: h5Mouse.containsMouse ? Qt.rgba(0.99, 0.82, 0.20, 0.22) : "transparent"
               MouseArea {
                 id: h5Mouse
                 anchors.fill: parent
@@ -2465,12 +2469,12 @@ Item {
                   implicitHeight: 18
                   implicitWidth: Math.max(18, keyTxt5.implicitWidth + 8)
                   radius: 4
-                  color: Qt.rgba(1, 1, 1, 0.15)
-                  border.color: Qt.rgba(1, 1, 1, 0.35)
+                  color: Qt.rgba(0.99, 0.82, 0.20, 0.25)
+                  border.color: "#FDE047"
                   border.width: 1
-                  Text { id: keyTxt5; anchors.centerIn: parent; text: "P"; font.pixelSize: 9; font.weight: Font.Bold; color: "#ffffff" }
+                  Text { id: keyTxt5; anchors.centerIn: parent; text: "P"; font.pixelSize: 9; font.weight: Font.Bold; color: "#FDE047" }
                 }
-                Text { text: "󰤱 Pin"; font.pixelSize: 10; color: "#ffffff" }
+                Text { text: "📌 Pin"; font.pixelSize: 10; font.weight: Font.Medium; color: "#FDE047" }
               }
             }
 
