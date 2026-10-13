@@ -2,15 +2,23 @@
   "id": "ac.snapshots",
   "name": "Snapshots & Recovery",
   "version": "1.0.0",
-  "description": "Visual Btrfs & Snapper snapshot manager and recovery HUD for Omarchy. View recovery points, inspect diffs, browse snapshot files, and verify bootloader sync.",
+  "description": "Visual Btrfs & Snapper snapshot manager, diff inspector, single-file rollback, and bootloader recovery HUD for Omarchy Linux.",
   "author": "Atanas Chalakov",
+  "homepage": "https://github.com/atanas-chalakov/omarchy-snapshots",
+  "repository": "https://github.com/atanas-chalakov/omarchy-snapshots.git",
+  "license": "MIT",
   "category": "System",
   "tags": [
-    "system",
+    "omarchy",
+    "omarchy-plugin",
     "quickshell",
-    "snapper",
     "btrfs",
-    "recovery"
+    "snapper",
+    "recovery",
+    "limine",
+    "rollback",
+    "system"
   ],
-  "entry": "SnapshotsHUD.qml"
+  "entry": "SnapshotsHUD.qml",
+  "preview": "preview.png"
 }

@@ -38,6 +38,11 @@ Omarchy configures Btrfs and Snapper out-of-the-box, taking automatic snapshots 
 | ![Create Checkpoint](assets/screenshots/create-modal.png) | ![Restore Confirmation](assets/screenshots/restore-modal.png) |
 | *One-click named checkpoints with quick preset chips & auto-prune pinning* | *Guided safety confirmation before executing Limine bootloader rollback* |
 
+| Smart Btrfs Disk Optimizer | Limine Boot Verification & Sync |
+| :---: | :---: |
+| ![Disk Optimizer](assets/screenshots/optimizer-modal.png) | ![Boot Verification](assets/screenshots/boot-sync-modal.png) |
+| *Intelligent space reclaim with safety retention lock on critical milestones* | *Kernel verification and ESP partition monitoring for instant boot recovery* |
+
 ---
 
 ## Key Features
