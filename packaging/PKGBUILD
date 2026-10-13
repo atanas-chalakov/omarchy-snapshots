@@ -1,6 +1,6 @@
 # Maintainer: Atanas Chalakov <atanas@chalakov.com>
 pkgname=omarchy-snapshots
-pkgver=1.0.0
+pkgver=1.1.0
 pkgrel=1
 pkgdesc="Visual Btrfs & Snapper snapshot manager, diff inspector, and recovery HUD for Omarchy"
 arch=('any')
