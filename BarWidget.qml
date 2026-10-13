@@ -1,5 +1,4 @@
 import QtQuick
-import qs.Commons
 import qs.Ui
 
 BarWidget {
@@ -15,6 +14,7 @@ BarWidget {
     bar: root.bar
     text: "󰆼"
     horizontalMargin: 7.5
+    tooltipText: "Snapshots & Recovery\nLeft-click: Open HUD | Right-click: New Checkpoint"
     onPressed: function(btn) {
       if (!root.bar) return
       if (btn === Qt.RightButton) {

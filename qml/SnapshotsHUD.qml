@@ -90,6 +90,7 @@ Item {
         else if (typeof diffModalCard !== "undefined") diffModalCard.forceActiveFocus()
       })
     } else {
+      if (diffProcess.running) diffProcess.running = false
       if (keyCatcher) keyCatcher.forceActiveFocus()
     }
   }
@@ -130,6 +131,7 @@ Item {
         if (typeof optimizeModalCard !== "undefined") optimizeModalCard.forceActiveFocus()
       })
     } else {
+      if (!root.isOptimizing && estimateOptimizeProcess.running) estimateOptimizeProcess.running = false
       if (keyCatcher) keyCatcher.forceActiveFocus()
     }
   }
@@ -140,6 +142,7 @@ Item {
         if (typeof bootModalCard !== "undefined") bootModalCard.forceActiveFocus()
       })
     } else {
+      if (!root.isSyncingBoot && bootHealthProcess.running) bootHealthProcess.running = false
       if (keyCatcher) keyCatcher.forceActiveFocus()
     }
   }
@@ -795,6 +798,16 @@ Item {
     })
   }
 
+  Component.onDestruction: {
+    if (statusProcess.running) statusProcess.running = false
+    if (actionProcess.running) actionProcess.running = false
+    if (diffProcess.running) diffProcess.running = false
+    if (restoreFileProcess.running) restoreFileProcess.running = false
+    if (estimateOptimizeProcess.running) estimateOptimizeProcess.running = false
+    if (bootHealthProcess.running) bootHealthProcess.running = false
+    if (bootSyncProcess.running) bootSyncProcess.running = false
+  }
+
   // Floating Window Container
   FloatingWindow {
     id: window
@@ -814,6 +827,9 @@ Item {
           if (keyCatcher) keyCatcher.forceActiveFocus()
         })
       } else {
+        if (diffProcess.running) diffProcess.running = false
+        if (estimateOptimizeProcess.running) estimateOptimizeProcess.running = false
+        if (bootHealthProcess.running) bootHealthProcess.running = false
         if (!root.closingFromHost && root.shell && typeof root.shell.hide === "function") {
           root.shell.hide((root.manifest && root.manifest.id) || "ac.snapshots")
         }
@@ -1050,8 +1066,10 @@ Item {
 
           Rectangle {
             Layout.alignment: Qt.AlignVCenter
-            width: 44
-            height: 44
+            implicitWidth: 44
+            implicitHeight: 44
+            Layout.preferredWidth: 44
+            Layout.preferredHeight: 44
             radius: 12
             color: Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.15)
             border.color: Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.3)
@@ -1104,14 +1122,17 @@ Item {
                   spacing: 6
 
                   Rectangle {
-                    width: 6
-                    height: 6
+                    implicitWidth: 6
+                    implicitHeight: 6
+                    Layout.preferredWidth: 6
+                    Layout.preferredHeight: 6
                     radius: 3
                     color: healthPill.statusColor
                   }
 
                   Text {
                     id: healthLabel
+                    textFormat: Text.PlainText
                     text: (root.statusData && root.statusData.health && root.statusData.health.label) || "Checking..."
                     font.pixelSize: 11
                     font.weight: Font.DemiBold
@@ -1122,6 +1143,7 @@ Item {
             }
 
             Text {
+              textFormat: Text.PlainText
               text: (root.statusData && root.statusData.health && root.statusData.health.reason) || "Checking Btrfs subvolumes and bootloader synchronization..."
               font.pixelSize: 11
               color: Color.muted
@@ -1162,14 +1184,17 @@ Item {
                 spacing: 6
 
                 Rectangle {
-                  width: 6
-                  height: 6
+                  implicitWidth: 6
+                  implicitHeight: 6
+                  Layout.preferredWidth: 6
+                  Layout.preferredHeight: 6
                   radius: 3
                   color: root.useMockData ? "#FDE047" : Color.muted
                 }
 
                 Text {
                   id: mockToggleText
+                  textFormat: Text.PlainText
                   text: root.useMockData ? "DEV: Demo ON" : "DEV: Demo OFF"
                   font.pixelSize: 11
                   font.weight: root.useMockData ? Font.DemiBold : Font.Normal
@@ -1359,6 +1384,7 @@ Item {
               color: Color.accent
             }
             Text {
+              textFormat: Text.PlainText
               text: root.statusNotification
               font.pixelSize: 12
               color: Color.foreground
@@ -1460,8 +1486,10 @@ Item {
               Layout.alignment: Qt.AlignVCenter
 
               Rectangle {
-                width: 32
-                height: 32
+                implicitWidth: 32
+                implicitHeight: 32
+                Layout.preferredWidth: 32
+                Layout.preferredHeight: 32
                 radius: 8
                 color: Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.12)
                 border.color: Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.25)
@@ -1497,6 +1525,7 @@ Item {
                     Text {
                       id: subvolTxt
                       anchors.centerIn: parent
+                      textFormat: Text.PlainText
                       text: "@" + (storageTelemetryCard.subvolPath === "/" ? "root" : storageTelemetryCard.subvolPath.replace(/^\//, ""))
                       font.pixelSize: 9
                       font.weight: Font.Medium
@@ -1506,6 +1535,7 @@ Item {
                 }
 
                 Text {
+                  textFormat: Text.PlainText
                   text: (storageTelemetryCard.storage.fsAvailHuman || "0 B") + " free of " + (storageTelemetryCard.storage.fsSizeHuman || "0 B")
                   font.pixelSize: 11
                   color: Color.muted
@@ -1521,7 +1551,8 @@ Item {
 
               Rectangle {
                 Layout.fillWidth: true
-                height: 8
+                implicitHeight: 8
+                Layout.preferredHeight: 8
                 radius: 4
                 color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.08)
                 clip: true
@@ -1539,6 +1570,7 @@ Item {
               }
 
               Text {
+                textFormat: Text.PlainText
                 text: storageTelemetryCard.pct + "% used"
                 font.pixelSize: 11
                 font.weight: Font.Medium
@@ -1548,8 +1580,10 @@ Item {
 
             // Divider line between telemetry and actions
             Rectangle {
-              width: 1
-              height: 24
+              implicitWidth: 1
+              implicitHeight: 24
+              Layout.preferredWidth: 1
+              Layout.preferredHeight: 24
               color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.10)
               Layout.alignment: Qt.AlignVCenter
             }
@@ -1590,11 +1624,13 @@ Item {
                   spacing: 6
 
                   Text {
+                    textFormat: Text.PlainText
                     text: limineBootBtn.syncActive ? "󰌢" : "󰌣"
                     font.pixelSize: 12
                     color: limineBootBtn.bootColor
                   }
                   Text {
+                    textFormat: Text.PlainText
                     text: limineBootBtn.syncActive ? "Limine Boot Sync" : "Boot Sync Offline"
                     font.pixelSize: 11
                     font.weight: Font.Medium
@@ -1730,6 +1766,7 @@ Item {
 
                   Text {
                     visible: modelData.icon.length > 0
+                    textFormat: Text.PlainText
                     text: modelData.icon
                     font.pixelSize: 12
                     color: modelData.id === "pinned" ? "#FDE047" : (filterChipRect.selected ? Color.accent : Color.muted)
@@ -1737,6 +1774,7 @@ Item {
 
                   Text {
                     id: chipText
+                    textFormat: Text.PlainText
                     text: modelData.label
                     font.pixelSize: 11
                     font.weight: filterChipRect.selected ? Font.DemiBold : Font.Normal
@@ -1760,6 +1798,7 @@ Item {
                     Text {
                       id: chipKeyText
                       anchors.centerIn: parent
+                      textFormat: Text.PlainText
                       text: modelData.key
                       font.pixelSize: 9
                       font.weight: Font.Bold
@@ -1856,8 +1895,10 @@ Item {
               Rectangle {
                 visible: searchInput.text.length > 0
                 Layout.alignment: Qt.AlignVCenter
-                width: 16
-                height: 16
+                implicitWidth: 16
+                implicitHeight: 16
+                Layout.preferredWidth: 16
+                Layout.preferredHeight: 16
                 radius: 8
                 color: clearSearchMouse.containsMouse ? Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.15) : "transparent"
 
@@ -1914,6 +1955,7 @@ Item {
                 }
                 Text {
                   Layout.alignment: Qt.AlignHCenter
+                  textFormat: Text.PlainText
                   text: root.snapshotsList.length === 0 ? "No snapshots found on system." : "No snapshots match current filter."
                   font.pixelSize: 13
                   color: Color.muted
@@ -1971,8 +2013,10 @@ Item {
 
                 // Snapshot ID Badge
                 Rectangle {
-                  width: 44
-                  height: 44
+                  implicitWidth: 44
+                  implicitHeight: 44
+                  Layout.preferredWidth: 44
+                  Layout.preferredHeight: 44
                   radius: 8
                   color: modelData.important ? Qt.rgba(0.99, 0.82, 0.20, 0.22) : Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.1)
                   border.color: modelData.important ? "#FDE047" : Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.25)
@@ -1983,6 +2027,7 @@ Item {
                     spacing: 0
                     Text {
                       Layout.alignment: Qt.AlignHCenter
+                      textFormat: Text.PlainText
                       text: "#" + modelData.id
                       font.pixelSize: 13
                       font.weight: Font.Bold
@@ -1990,6 +2035,7 @@ Item {
                     }
                     Text {
                       Layout.alignment: Qt.AlignHCenter
+                      textFormat: Text.PlainText
                       text: modelData.cleanup === "none" ? "keep" : "auto"
                       font.pixelSize: 9
                       font.weight: Font.Medium
@@ -2006,6 +2052,7 @@ Item {
                   RowLayout {
                     spacing: 8
                     Text {
+                      textFormat: Text.PlainText
                       text: modelData.description || ("Snapshot #" + modelData.id)
                       font.pixelSize: 13
                       font.weight: Font.DemiBold
@@ -2055,11 +2102,13 @@ Item {
                         anchors.centerIn: parent
                         spacing: 3
                         Text {
+                          textFormat: Text.PlainText
                           text: parent.parent.isBootable ? "󰌢" : "󰌣"
                           font.pixelSize: 10
                           color: parent.parent.isBootable ? "#10B981" : "#EF4444"
                         }
                         Text {
+                          textFormat: Text.PlainText
                           text: parent.parent.isBootable ? "Limine Boot" : "Not in Limine"
                           font.pixelSize: 9
                           font.weight: Font.Medium
@@ -2083,11 +2132,13 @@ Item {
                         anchors.centerIn: parent
                         spacing: 4
                         Text {
+                          textFormat: Text.PlainText
                           text: modelData.hasCriticalPackages ? "󰒋" : "󰏔"
                           font.pixelSize: 10
                           color: modelData.hasCriticalPackages ? "#F59E0B" : Color.accent
                         }
                         Text {
+                          textFormat: Text.PlainText
                           text: modelData.packageCount + " pkgs"
                           font.pixelSize: 9
                           font.weight: Font.Medium
@@ -2100,17 +2151,20 @@ Item {
                   RowLayout {
                     spacing: 12
                     Text {
+                      textFormat: Text.PlainText
                       text: "󰅐 " + (modelData.relativeAge || "")
                       font.pixelSize: 11
                       color: Color.muted
                     }
                     Text {
+                      textFormat: Text.PlainText
                       text: " " + (modelData.date || "")
                       font.pixelSize: 11
                       color: Color.muted
                     }
                     Text {
                       visible: (modelData.packageCount && modelData.packageCount > 0) ? true : false
+                      textFormat: Text.PlainText
                       text: "󰏖 " + (modelData.packageSummary || "")
                       font.pixelSize: 11
                       color: modelData.hasCriticalPackages ? "#F59E0B" : Color.muted
@@ -2238,6 +2292,7 @@ Item {
                       anchors.centerIn: parent
                       spacing: 5
                       Text {
+                        textFormat: Text.PlainText
                         text: modelData.important ? "󰤱" : "󰤲"
                         font.pixelSize: 13
                         color: modelData.important ? "#FDE047" : Color.muted
@@ -2922,6 +2977,7 @@ Item {
                       Text {
                         id: altNumTxt
                         anchors.centerIn: parent
+                        textFormat: Text.PlainText
                         text: "Alt+" + (index + 1)
                         font.pixelSize: 8
                         font.weight: Font.Bold
@@ -2930,6 +2986,7 @@ Item {
                     }
                     Text {
                       id: chipPresetText
+                      textFormat: Text.PlainText
                       text: modelData
                       font.pixelSize: 10
                       font.weight: Font.Medium
@@ -3032,8 +3089,10 @@ Item {
             RowLayout {
               spacing: 10
               Rectangle {
-                width: 20
-                height: 20
+                implicitWidth: 20
+                implicitHeight: 20
+                Layout.preferredWidth: 20
+                Layout.preferredHeight: 20
                 radius: 5
                 color: root.newSnapshotImportant ? Qt.rgba(0.99, 0.82, 0.20, 0.25) : Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.05)
                 border.color: root.newSnapshotImportant ? "#FDE047" : Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.18)
@@ -3226,6 +3285,7 @@ Item {
                 color: Color.accent
               }
               Text {
+                textFormat: Text.PlainText
                 text: "Changes in Snapshot #" + root.activeDiffSnapshotId + " vs Current System"
                 font.pixelSize: 16
                 font.weight: Font.Bold
@@ -3279,6 +3339,7 @@ Item {
                     color: parent.parent.active ? Color.accent : Color.muted
                   }
                   Text {
+                    textFormat: Text.PlainText
                     text: "File Changes (" + ((root.activeDiffData && root.activeDiffData.files) ? root.activeDiffData.files.length : 0) + ")"
                     font.pixelSize: 11
                     font.weight: parent.parent.active ? Font.Bold : Font.Normal
@@ -3306,11 +3367,13 @@ Item {
                   anchors.centerIn: parent
                   spacing: 6
                   Text {
+                    textFormat: Text.PlainText
                     text: (root.activeDiffData && root.activeDiffData.hasCriticalPackages) ? "󰒋" : "󰏖"
                     font.pixelSize: 12
                     color: (root.activeDiffData && root.activeDiffData.hasCriticalPackages) ? "#F59E0B" : (parent.parent.active ? Color.accent : Color.muted)
                   }
                   Text {
+                    textFormat: Text.PlainText
                     text: "Package Updates (" + parent.parent.pkgCount + ")"
                     font.pixelSize: 11
                     font.weight: parent.parent.active ? Font.Bold : Font.Normal
@@ -3471,6 +3534,7 @@ Item {
                   Text {
                     id: addSummaryText
                     anchors.centerIn: parent
+                    textFormat: Text.PlainText
                     text: "+" + (parent.parent.summary.added || 0) + " Added"
                     font.pixelSize: 10
                     font.weight: Font.Medium
@@ -3485,6 +3549,7 @@ Item {
                   Text {
                     id: modSummaryText
                     anchors.centerIn: parent
+                    textFormat: Text.PlainText
                     text: "~" + (parent.parent.summary.modified || 0) + " Modified"
                     font.pixelSize: 10
                     font.weight: Font.Medium
@@ -3499,6 +3564,7 @@ Item {
                   Text {
                     id: delSummaryText
                     anchors.centerIn: parent
+                    textFormat: Text.PlainText
                     text: "-" + (parent.parent.summary.deleted || 0) + " Deleted"
                     font.pixelSize: 10
                     font.weight: Font.Medium
@@ -3512,6 +3578,7 @@ Item {
                 visible: diffModalCard.diffTab === "packages"
                 spacing: 8
                 Text {
+                  textFormat: Text.PlainText
                   text: (root.activeDiffData && root.activeDiffData.packageSummary) ? ("󰏖 " + root.activeDiffData.packageSummary) : "No packages logged"
                   font.pixelSize: 11
                   color: (root.activeDiffData && root.activeDiffData.hasCriticalPackages) ? "#F59E0B" : Color.muted
@@ -3577,6 +3644,7 @@ Item {
 
                   Text {
                     anchors.fill: parent
+                    textFormat: Text.PlainText
                     text: diffModalCard.diffTab === "files" ? "Filter changed files (e.g. /etc or .conf)..." : "Filter packages (e.g. linux, hyprland, mesa)..."
                     font.pixelSize: 11
                     color: Color.muted
@@ -3700,12 +3768,15 @@ Item {
                     spacing: 8
 
                     Rectangle {
-                      width: 18
-                      height: 18
+                      implicitWidth: 18
+                      implicitHeight: 18
+                      Layout.preferredWidth: 18
+                      Layout.preferredHeight: 18
                       radius: 4
                       color: modelData.status === "added" ? Qt.rgba(0.06, 0.72, 0.51, 0.2) : (modelData.status === "deleted" ? Qt.rgba(0.94, 0.27, 0.27, 0.2) : Qt.rgba(0.96, 0.62, 0.04, 0.2))
                       Text {
                         anchors.centerIn: parent
+                        textFormat: Text.PlainText
                         text: modelData.status === "added" ? "+" : (modelData.status === "deleted" ? "-" : "~")
                         font.pixelSize: 11
                         font.weight: Font.Bold
@@ -3714,6 +3785,7 @@ Item {
                     }
 
                     Text {
+                      textFormat: Text.PlainText
                       text: modelData.path
                       font.pixelSize: 11
                       font.family: Style.font.monospace
@@ -3854,6 +3926,7 @@ Item {
                     Text { Layout.alignment: Qt.AlignHCenter; text: "󰏖"; font.pixelSize: 28; color: Color.muted }
                     Text {
                       Layout.alignment: Qt.AlignHCenter
+                      textFormat: Text.PlainText
                       text: (root.activeDiffData && root.activeDiffData.packageCount > 0) ? "No packages match filter." : "No package changes recorded for this snapshot."
                       font.pixelSize: 12
                       color: Color.muted
@@ -3898,6 +3971,7 @@ Item {
                       Text {
                         id: actTxt
                         anchors.centerIn: parent
+                        textFormat: Text.PlainText
                         text: modelData.action
                         font.pixelSize: 9
                         font.weight: Font.Bold
@@ -3907,6 +3981,7 @@ Item {
 
                     // Package name
                     Text {
+                      textFormat: Text.PlainText
                       text: modelData.name
                       font.pixelSize: 12
                       font.weight: Font.DemiBold
@@ -3928,6 +4003,7 @@ Item {
                         Text { text: "󰒋"; font.pixelSize: 9; color: "#F59E0B" }
                         Text {
                           id: catTxt
+                          textFormat: Text.PlainText
                           text: modelData.criticalCategory || "Critical"
                           font.pixelSize: 9
                           font.weight: Font.Bold
@@ -3940,6 +4016,7 @@ Item {
 
                     // Version transition
                     Text {
+                      textFormat: Text.PlainText
                       text: modelData.version || ""
                       font.pixelSize: 11
                       font.family: Style.font.monospace
@@ -4003,6 +4080,7 @@ Item {
               spacing: 10
               Text { text: "󰁯"; font.pixelSize: 22; color: "#10B981" }
               Text {
+                textFormat: Text.PlainText
                 text: "Restore System to Snapshot #" + (root.activeRestoreSnapshot ? root.activeRestoreSnapshot.id : "")
                 font.pixelSize: 16
                 font.weight: Font.Bold
@@ -4031,6 +4109,7 @@ Item {
             }
 
             Text {
+              textFormat: Text.PlainText
               text: "This will invoke Limine & Snapper rollback to restore the root filesystem to the state recorded at " + (root.activeRestoreSnapshot ? root.activeRestoreSnapshot.date : "") + " (" + (root.activeRestoreSnapshot ? root.activeRestoreSnapshot.description : "") + ").\n\nAll package and root system changes made since this snapshot will be reverted upon reboot."
               font.pixelSize: 12
               color: Color.muted
@@ -4222,6 +4301,7 @@ Item {
               spacing: 10
               Text { text: "󰆴"; font.pixelSize: 22; color: Color.urgent }
               Text {
+                textFormat: Text.PlainText
                 text: "Delete Snapshot #" + (root.activeDeleteSnapshot ? root.activeDeleteSnapshot.id : "")
                 font.pixelSize: 16
                 font.weight: Font.Bold
@@ -4250,6 +4330,7 @@ Item {
             }
 
             Text {
+              textFormat: Text.PlainText
               text: "Are you sure you want to permanently delete snapshot #" + (root.activeDeleteSnapshot ? root.activeDeleteSnapshot.id : "") + " (" + (root.activeDeleteSnapshot ? root.activeDeleteSnapshot.description : "") + ")?\nThis recovery point and its boot entry will be permanently removed."
               font.pixelSize: 12
               color: Color.muted
@@ -4441,6 +4522,7 @@ Item {
               spacing: 10
               Text { text: "󰁌"; font.pixelSize: 22; color: "#10B981" }
               Text {
+                textFormat: Text.PlainText
                 text: "Roll Back File from Snapshot #" + root.activeRestoreFileSnapshotId
                 font.pixelSize: 16
                 font.weight: Font.Bold
@@ -4469,6 +4551,7 @@ Item {
             }
 
             Text {
+              textFormat: Text.PlainText
               text: "Restore this individual file to its exact state recorded in snapshot #" + root.activeRestoreFileSnapshotId + ":"
               font.pixelSize: 12
               color: Color.muted
@@ -4490,6 +4573,7 @@ Item {
                 spacing: 8
                 Text { text: "󰈔"; font.pixelSize: 14; color: Color.accent }
                 Text {
+                  textFormat: Text.PlainText
                   text: root.activeRestoreFilePath
                   font.pixelSize: 12
                   font.family: Style.font.monospace
@@ -4527,6 +4611,7 @@ Item {
                   }
                 }
                 Text {
+                  textFormat: Text.PlainText
                   text: "The current live file will be safely preserved as a timestamped backup (" + root.activeRestoreFilePath + ".bak.<timestamp>) before applying changes."
                   font.pixelSize: 10
                   color: Color.muted
@@ -4709,6 +4794,7 @@ Item {
                   color: Color.foreground
                 }
                 Text {
+                  textFormat: Text.PlainText
                   text: (root.activeOptimizeData && root.activeOptimizeData.retentionPolicy) || "Analyzing retention guards and space reclamation..."
                   font.pixelSize: 11
                   color: Color.muted
@@ -4754,14 +4840,15 @@ Item {
                   anchors.centerIn: parent
                   spacing: 2
                   Text {
-                    anchors.horizontalCenter: parent.horizontalCenter
+                    Layout.alignment: Qt.AlignHCenter
+                    textFormat: Text.PlainText
                     text: String((root.activeOptimizeData && root.activeOptimizeData.totalSnapshots) || 0)
                     font.pixelSize: 15
                     font.weight: Font.Bold
                     color: Color.foreground
                   }
                   Text {
-                    anchors.horizontalCenter: parent.horizontalCenter
+                    Layout.alignment: Qt.AlignHCenter
                     text: "Total Points"
                     font.pixelSize: 9
                     color: Color.muted
@@ -4780,14 +4867,15 @@ Item {
                   anchors.centerIn: parent
                   spacing: 2
                   Text {
-                    anchors.horizontalCenter: parent.horizontalCenter
+                    Layout.alignment: Qt.AlignHCenter
+                    textFormat: Text.PlainText
                     text: String((root.activeOptimizeData && root.activeOptimizeData.protectedCount) || 0)
                     font.pixelSize: 15
                     font.weight: Font.Bold
                     color: "#10B981"
                   }
                   Text {
-                    anchors.horizontalCenter: parent.horizontalCenter
+                    Layout.alignment: Qt.AlignHCenter
                     text: "󰞌 Protected"
                     font.pixelSize: 9
                     font.weight: Font.Medium
@@ -4807,14 +4895,15 @@ Item {
                   anchors.centerIn: parent
                   spacing: 2
                   Text {
-                    anchors.horizontalCenter: parent.horizontalCenter
+                    Layout.alignment: Qt.AlignHCenter
+                    textFormat: Text.PlainText
                     text: String((root.activeOptimizeData && root.activeOptimizeData.prunableCount) || 0)
                     font.pixelSize: 15
                     font.weight: Font.Bold
                     color: "#F59E0B"
                   }
                   Text {
-                    anchors.horizontalCenter: parent.horizontalCenter
+                    Layout.alignment: Qt.AlignHCenter
                     text: "󰆴 Prunable Stale"
                     font.pixelSize: 9
                     font.weight: Font.Medium
@@ -4834,14 +4923,15 @@ Item {
                   anchors.centerIn: parent
                   spacing: 2
                   Text {
-                    anchors.horizontalCenter: parent.horizontalCenter
+                    Layout.alignment: Qt.AlignHCenter
+                    textFormat: Text.PlainText
                     text: (root.activeOptimizeData && root.activeOptimizeData.reclaimableHuman) ? ("~" + root.activeOptimizeData.reclaimableHuman) : "0 B"
                     font.pixelSize: 15
                     font.weight: Font.Bold
                     color: "#10B981"
                   }
                   Text {
-                    anchors.horizontalCenter: parent.horizontalCenter
+                    Layout.alignment: Qt.AlignHCenter
                     text: "󰚰 Est. Reclaim"
                     font.pixelSize: 9
                     font.weight: Font.Bold
@@ -4983,6 +5073,7 @@ Item {
                     spacing: 8
 
                     Text {
+                      textFormat: Text.PlainText
                       text: "#" + modelData.id
                       font.pixelSize: 11
                       font.weight: Font.Bold
@@ -4990,6 +5081,7 @@ Item {
                     }
 
                     Text {
+                      textFormat: Text.PlainText
                       text: modelData.description || ""
                       font.pixelSize: 11
                       color: Color.muted
@@ -4998,6 +5090,7 @@ Item {
                     }
 
                     Text {
+                      textFormat: Text.PlainText
                       text: modelData.age || ""
                       font.pixelSize: 10
                       color: Color.muted
@@ -5011,6 +5104,7 @@ Item {
                       Text {
                         id: estTxt
                         anchors.centerIn: parent
+                        textFormat: Text.PlainText
                         text: "~" + (modelData.estimatedHuman || "")
                         font.pixelSize: 9
                         font.weight: Font.Bold
@@ -5092,6 +5186,7 @@ Item {
                   anchors.centerIn: parent
                   spacing: 6
                   Text {
+                    textFormat: Text.PlainText
                     text: root.isOptimizing ? "󰑐" : "󰚰"
                     font.pixelSize: 13
                     color: (root.activeOptimizeData && root.activeOptimizeData.prunableCount > 0 && !root.isOptimizing) ? "#ffffff" : Color.muted
@@ -5099,6 +5194,7 @@ Item {
                     Behavior on rotation { NumberAnimation { duration: 400 } }
                   }
                   Text {
+                    textFormat: Text.PlainText
                     text: root.isOptimizing ? "Pruning Snapshots..." : "Clean & Reclaim Space"
                     font.pixelSize: 11
                     font.weight: Font.Bold
@@ -5213,6 +5309,7 @@ Item {
                   color: Color.foreground
                 }
                 Text {
+                  textFormat: Text.PlainText
                   text: (root.activeBootData && root.activeBootData.healthReason) || "Inspecting Limine configuration, EFI kernel payloads and ESP headroom..."
                   font.pixelSize: 11
                   color: Color.muted
@@ -5236,11 +5333,13 @@ Item {
                   anchors.centerIn: parent
                   spacing: 4
                   Text {
+                    textFormat: Text.PlainText
                     text: parent.parent.isHealthy ? "●" : "▲"
                     font.pixelSize: 8
                     color: parent.parent.isHealthy ? "#10B981" : "#F59E0B"
                   }
                   Text {
+                    textFormat: Text.PlainText
                     text: (root.activeBootData && root.activeBootData.healthLabel) || "Checking..."
                     font.pixelSize: 10
                     font.weight: Font.Bold
@@ -5289,14 +5388,16 @@ Item {
                   anchors.centerIn: parent
                   spacing: 2
                   Text {
-                    anchors.horizontalCenter: parent.horizontalCenter
+                    Layout.alignment: Qt.AlignHCenter
+                    textFormat: Text.PlainText
                     text: root.activeBootData ? (root.activeBootData.espUsedHuman + " / " + root.activeBootData.espSizeHuman) : "--"
                     font.pixelSize: 12
                     font.weight: Font.Bold
                     color: (root.activeBootData && root.activeBootData.espWarning) ? "#EF4444" : Color.foreground
                   }
                   Text {
-                    anchors.horizontalCenter: parent.horizontalCenter
+                    Layout.alignment: Qt.AlignHCenter
+                    textFormat: Text.PlainText
                     text: root.activeBootData ? ("ESP " + root.activeBootData.espUsedPercent + "% used (" + root.activeBootData.limitUsagePercent + "% limit)") : "ESP Storage"
                     font.pixelSize: 9
                     color: Color.muted
@@ -5315,14 +5416,15 @@ Item {
                   anchors.centerIn: parent
                   spacing: 2
                   Text {
-                    anchors.horizontalCenter: parent.horizontalCenter
+                    Layout.alignment: Qt.AlignHCenter
+                    textFormat: Text.PlainText
                     text: (root.activeBootData && root.activeBootData.daemonActive) ? "Active" : "Offline"
                     font.pixelSize: 13
                     font.weight: Font.Bold
                     color: (root.activeBootData && root.activeBootData.daemonActive) ? "#10B981" : "#EF4444"
                   }
                   Text {
-                    anchors.horizontalCenter: parent.horizontalCenter
+                    Layout.alignment: Qt.AlignHCenter
                     text: "limine-snapper-sync"
                     font.pixelSize: 9
                     color: Color.muted
@@ -5341,14 +5443,15 @@ Item {
                   anchors.centerIn: parent
                   spacing: 2
                   Text {
-                    anchors.horizontalCenter: parent.horizontalCenter
+                    Layout.alignment: Qt.AlignHCenter
+                    textFormat: Text.PlainText
                     text: root.activeBootData ? (String(root.activeBootData.totalEntries) + " Snapshots") : "--"
                     font.pixelSize: 13
                     font.weight: Font.Bold
                     color: "#10B981"
                   }
                   Text {
-                    anchors.horizontalCenter: parent.horizontalCenter
+                    Layout.alignment: Qt.AlignHCenter
                     text: "Limine Boot Menu"
                     font.pixelSize: 9
                     color: Color.muted
@@ -5367,14 +5470,16 @@ Item {
                   anchors.centerIn: parent
                   spacing: 2
                   Text {
-                    anchors.horizontalCenter: parent.horizontalCenter
+                    Layout.alignment: Qt.AlignHCenter
+                    textFormat: Text.PlainText
                     text: (root.activeBootData && root.activeBootData.lastSyncRelative) ? root.activeBootData.lastSyncRelative : "--"
                     font.pixelSize: 13
                     font.weight: Font.Bold
                     color: Color.foreground
                   }
                   Text {
-                    anchors.horizontalCenter: parent.horizontalCenter
+                    Layout.alignment: Qt.AlignHCenter
+                    textFormat: Text.PlainText
                     text: (root.activeBootData && root.activeBootData.lastSyncTimestamp) ? root.activeBootData.lastSyncTimestamp : "Last Synced"
                     font.pixelSize: 9
                     color: Color.muted
@@ -5489,6 +5594,7 @@ Item {
                       color: Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.15)
                       Text {
                         anchors.centerIn: parent
+                        textFormat: Text.PlainText
                         text: "#" + modelData.snapshotId
                         font.pixelSize: 9
                         font.weight: Font.Bold
@@ -5497,6 +5603,7 @@ Item {
                     }
 
                     Text {
+                      textFormat: Text.PlainText
                       text: modelData.kernel + (modelData.kernelRelease ? (" (" + modelData.kernelRelease + ")") : "")
                       font.pixelSize: 11
                       color: Color.foreground
@@ -5505,6 +5612,7 @@ Item {
                     }
 
                     Text {
+                      textFormat: Text.PlainText
                       text: modelData.efiPayload || "EFI"
                       font.pixelSize: 11
                       font.family: "monospace"
@@ -5514,6 +5622,7 @@ Item {
                     }
 
                     Text {
+                      textFormat: Text.PlainText
                       text: modelData.timestamp || ""
                       font.pixelSize: 10
                       color: Color.muted
@@ -5546,13 +5655,13 @@ Item {
                     anchors.centerIn: parent
                     spacing: 6
                     Text {
-                      anchors.horizontalCenter: parent.horizontalCenter
+                      Layout.alignment: Qt.AlignHCenter
                       text: "󰄬"
                       font.pixelSize: 22
                       color: Color.muted
                     }
                     Text {
-                      anchors.horizontalCenter: parent.horizontalCenter
+                      Layout.alignment: Qt.AlignHCenter
                       text: "No snapshot entries registered in Limine configuration."
                       font.pixelSize: 12
                       color: Color.muted
@@ -5639,6 +5748,7 @@ Item {
                   anchors.centerIn: parent
                   spacing: 6
                   Text {
+                    textFormat: Text.PlainText
                     text: root.isSyncingBoot ? "󰑐" : "󰌢"
                     font.pixelSize: 13
                     color: root.isSyncingBoot ? Color.muted : "#ffffff"
@@ -5646,6 +5756,7 @@ Item {
                     Behavior on rotation { NumberAnimation { duration: 400 } }
                   }
                   Text {
+                    textFormat: Text.PlainText
                     text: root.isSyncingBoot ? "Syncing Limine..." : "Sync Bootloader Now"
                     font.pixelSize: 11
                     font.weight: Font.Bold

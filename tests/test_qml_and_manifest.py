@@ -97,6 +97,7 @@ class TestQmlAndManifest(unittest.TestCase):
         self.assertIn("WidgetButton", content)
         self.assertIn("moduleName: \"ac.snapshots\"", content)
         self.assertIn("omarchy-shell shell toggle ac.snapshots", content)
+        self.assertIn("tooltipText", content)
 
     def test_hud_components(self):
         hud_path = os.path.join(PROJECT_ROOT, "SnapshotsHUD.qml")
@@ -318,6 +319,64 @@ class TestQmlAndManifest(unittest.TestCase):
         self.assertIn("function executeRestoreFile()", content)
         self.assertIn("property bool showRestoreFileModal: false", content)
         self.assertIn("if (!activeRestoreFilePath || !activeRestoreFileSnapshotId) return", content)
+
+    def test_qml_text_format_security(self):
+        """
+        Verify that all dynamic Text elements declare explicit textFormat (Text.PlainText).
+        Enforces the official Omarchy security standard to prevent unauthenticated outbound
+        HTTP GET requests via RichText <img src="..."> promotion and markup parsing issues.
+        """
+        scan_script = "/home/ac/Work/omarchy/test/shell.d/qml-text-format-scan.py"
+        if not os.path.isfile(scan_script):
+            self.skipTest("Omarchy qml-text-format-scan.py not found")
+
+        import tempfile
+        with tempfile.TemporaryDirectory() as td:
+            shell_dir = os.path.join(td, "shell")
+            os.makedirs(shell_dir, exist_ok=True)
+            for qf in ["SnapshotsHUD.qml", "BarWidget.qml"]:
+                src = os.path.join(PROJECT_ROOT, qf)
+                if os.path.isfile(src):
+                    os.symlink(src, os.path.join(shell_dir, qf))
+
+            res = subprocess.run([sys.executable, scan_script, td], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+            violations = [line for line in res.stdout.splitlines() if line.strip()]
+            self.assertEqual(len(violations), 0, f"Found QML Text elements without explicit textFormat:\n" + "\n".join(violations))
+
+    def test_qmllint_layout_positioning(self):
+        """
+        Verify that qmllint reports 0 undefined layout positioning warnings
+        (no anchors on items managed by ColumnLayout/RowLayout).
+        """
+        qmllint_bin = "/usr/lib/qt6/bin/qmllint"
+        if not os.path.isfile(qmllint_bin) or not os.access(qmllint_bin, os.X_OK):
+            self.skipTest("Qt6 qmllint binary not found")
+
+        import tempfile
+        with tempfile.TemporaryDirectory() as td:
+            qs_dir = os.path.join(td, "qs")
+            os.makedirs(qs_dir, exist_ok=True)
+            os.symlink("/home/ac/Work/omarchy/shell/Ui", os.path.join(qs_dir, "Ui"))
+            os.symlink("/home/ac/Work/omarchy/shell/Commons", os.path.join(qs_dir, "Commons"))
+
+            hud_qml = os.path.join(PROJECT_ROOT, "SnapshotsHUD.qml")
+            res = subprocess.run([qmllint_bin, "-I", td, hud_qml], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+            layout_warnings = [l for l in res.stderr.splitlines() if "Quick.layout-positioning" in l]
+            self.assertEqual(len(layout_warnings), 0, f"qmllint found layout positioning warnings:\n" + "\n".join(layout_warnings))
+
+    def test_process_lifecycle_cleanup(self):
+        """
+        Verify that running subprocesses are terminated when dialogs are closed,
+        the HUD is hidden, or the component is destroyed.
+        """
+        hud_path = os.path.join(PROJECT_ROOT, "SnapshotsHUD.qml")
+        with open(hud_path, "r", encoding="utf-8") as f:
+            content = f.read()
+
+        self.assertIn("Component.onDestruction", content)
+        self.assertIn("if (diffProcess.running) diffProcess.running = false", content)
+        self.assertIn("if (estimateOptimizeProcess.running) estimateOptimizeProcess.running = false", content)
+        self.assertIn("if (bootHealthProcess.running) bootHealthProcess.running = false", content)
 
 if __name__ == "__main__":
     unittest.main()
