@@ -3,7 +3,7 @@
   "name": "Snapshots & Recovery",
   "version": "1.0.0",
   "description": "Visual Btrfs & Snapper snapshot manager and recovery HUD for Omarchy. View recovery points, inspect diffs, browse snapshot files, and verify bootloader sync.",
-  "author": "ac",
+  "author": "Atanas Chalakov",
   "category": "System",
   "tags": [
     "system",

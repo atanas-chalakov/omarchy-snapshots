@@ -1414,7 +1414,7 @@ Item {
             Text {
               text: "󰌋"
               font.pixelSize: 22
-              color: parent.parent.authWarnColor
+              color: authWarningCard.authWarnColor
             }
 
             ColumnLayout {
@@ -1439,7 +1439,7 @@ Item {
               implicitHeight: 30
               implicitWidth: authBtnText.implicitWidth + 20
               radius: 6
-              color: parent.parent.authWarnColor
+              color: authWarningCard.authWarnColor
 
               MouseArea {
                 anchors.fill: parent
@@ -2089,6 +2089,7 @@ Item {
 
                     // Bootable in Limine Chip
                     Rectangle {
+                      id: bootChipBadge
                       implicitHeight: 20
                       implicitWidth: bootChipRow.implicitWidth + 12
                       radius: 10
@@ -2103,16 +2104,16 @@ Item {
                         spacing: 3
                         Text {
                           textFormat: Text.PlainText
-                          text: parent.parent.isBootable ? "󰌢" : "󰌣"
+                          text: bootChipBadge.isBootable ? "󰌢" : "󰌣"
                           font.pixelSize: 10
-                          color: parent.parent.isBootable ? "#10B981" : "#EF4444"
+                          color: bootChipBadge.isBootable ? "#10B981" : "#EF4444"
                         }
                         Text {
                           textFormat: Text.PlainText
-                          text: parent.parent.isBootable ? "Limine Boot" : "Not in Limine"
+                          text: bootChipBadge.isBootable ? "Limine Boot" : "Not in Limine"
                           font.pixelSize: 9
                           font.weight: Font.Medium
-                          color: parent.parent.isBootable ? "#10B981" : "#EF4444"
+                          color: bootChipBadge.isBootable ? "#10B981" : "#EF4444"
                         }
                       }
                     }
@@ -2587,6 +2588,7 @@ Item {
 
             // Hint: Restore
             Rectangle {
+              id: hintRestorePill
               implicitHeight: 24
               implicitWidth: h6Layout.implicitWidth + 10
               radius: 5
@@ -2611,10 +2613,10 @@ Item {
                   implicitHeight: 18
                   implicitWidth: Math.max(18, keyTxt6.implicitWidth + 8)
                   radius: 4
-                  color: Qt.rgba(parent.parent.restoreGreen.r, parent.parent.restoreGreen.g, parent.parent.restoreGreen.b, 0.18)
-                  border.color: Qt.rgba(parent.parent.restoreGreen.r, parent.parent.restoreGreen.g, parent.parent.restoreGreen.b, 0.35)
+                  color: Qt.rgba(hintRestorePill.restoreGreen.r, hintRestorePill.restoreGreen.g, hintRestorePill.restoreGreen.b, 0.18)
+                  border.color: Qt.rgba(hintRestorePill.restoreGreen.r, hintRestorePill.restoreGreen.g, hintRestorePill.restoreGreen.b, 0.35)
                   border.width: 1
-                  Text { id: keyTxt6; anchors.centerIn: parent; text: "R"; font.pixelSize: 9; font.weight: Font.Bold; color: parent.parent.parent.restoreGreen }
+                  Text { id: keyTxt6; anchors.centerIn: parent; text: "R"; font.pixelSize: 9; font.weight: Font.Bold; color: hintRestorePill.restoreGreen }
                 }
                 Text { text: "Restore"; font.pixelSize: 10; color: Color.muted }
               }
@@ -2770,10 +2772,10 @@ Item {
                   implicitHeight: 18
                   implicitWidth: Math.max(18, keyTxtOpt.implicitWidth + 8)
                   radius: 4
-                  color: Qt.rgba(parent.parent.optGreen.r, parent.parent.optGreen.g, parent.parent.optGreen.b, 0.18)
-                  border.color: Qt.rgba(parent.parent.optGreen.r, parent.parent.optGreen.g, parent.parent.optGreen.b, 0.35)
+                  color: Qt.rgba(hintOptimizePill.optGreen.r, hintOptimizePill.optGreen.g, hintOptimizePill.optGreen.b, 0.18)
+                  border.color: Qt.rgba(hintOptimizePill.optGreen.r, hintOptimizePill.optGreen.g, hintOptimizePill.optGreen.b, 0.35)
                   border.width: 1
-                  Text { id: keyTxtOpt; anchors.centerIn: parent; text: "O"; font.pixelSize: 9; font.weight: Font.Bold; color: parent.parent.parent.optGreen }
+                  Text { id: keyTxtOpt; anchors.centerIn: parent; text: "O"; font.pixelSize: 9; font.weight: Font.Bold; color: hintOptimizePill.optGreen }
                 }
                 Text { text: "Optimize"; font.pixelSize: 10; color: Color.muted }
               }
@@ -2802,10 +2804,10 @@ Item {
                   implicitHeight: 18
                   implicitWidth: Math.max(18, keyTxtLimine.implicitWidth + 8)
                   radius: 4
-                  color: Qt.rgba(parent.parent.limineGreen.r, parent.parent.limineGreen.g, parent.parent.limineGreen.b, 0.18)
-                  border.color: Qt.rgba(parent.parent.limineGreen.r, parent.parent.limineGreen.g, parent.parent.limineGreen.b, 0.35)
+                  color: Qt.rgba(hintLiminePill.limineGreen.r, hintLiminePill.limineGreen.g, hintLiminePill.limineGreen.b, 0.18)
+                  border.color: Qt.rgba(hintLiminePill.limineGreen.r, hintLiminePill.limineGreen.g, hintLiminePill.limineGreen.b, 0.35)
                   border.width: 1
-                  Text { id: keyTxtLimine; anchors.centerIn: parent; text: "L"; font.pixelSize: 9; font.weight: Font.Bold; color: parent.parent.parent.limineGreen }
+                  Text { id: keyTxtLimine; anchors.centerIn: parent; text: "L"; font.pixelSize: 9; font.weight: Font.Bold; color: hintLiminePill.limineGreen }
                 }
                 Text { text: "Limine"; font.pixelSize: 10; color: Color.muted }
               }
@@ -3317,6 +3319,7 @@ Item {
             RowLayout {
               spacing: 8
               Rectangle {
+                id: tabFilesBtn
                 property bool active: diffModalCard.diffTab === "files"
                 implicitHeight: 28
                 implicitWidth: tabFilesRow.implicitWidth + 20
@@ -3336,19 +3339,20 @@ Item {
                   Text {
                     text: "󰈔"
                     font.pixelSize: 12
-                    color: parent.parent.active ? Color.accent : Color.muted
+                    color: tabFilesBtn.active ? Color.accent : Color.muted
                   }
                   Text {
                     textFormat: Text.PlainText
                     text: "File Changes (" + ((root.activeDiffData && root.activeDiffData.files) ? root.activeDiffData.files.length : 0) + ")"
                     font.pixelSize: 11
-                    font.weight: parent.parent.active ? Font.Bold : Font.Normal
-                    color: parent.parent.active ? Color.accent : Color.muted
+                    font.weight: tabFilesBtn.active ? Font.Bold : Font.Normal
+                    color: tabFilesBtn.active ? Color.accent : Color.muted
                   }
                 }
               }
 
               Rectangle {
+                id: tabPkgsBtn
                 property bool active: diffModalCard.diffTab === "packages"
                 property int pkgCount: (root.activeDiffData && root.activeDiffData.packageCount) || 0
                 implicitHeight: 28
@@ -3370,14 +3374,14 @@ Item {
                     textFormat: Text.PlainText
                     text: (root.activeDiffData && root.activeDiffData.hasCriticalPackages) ? "󰒋" : "󰏖"
                     font.pixelSize: 12
-                    color: (root.activeDiffData && root.activeDiffData.hasCriticalPackages) ? "#F59E0B" : (parent.parent.active ? Color.accent : Color.muted)
+                    color: (root.activeDiffData && root.activeDiffData.hasCriticalPackages) ? "#F59E0B" : (tabPkgsBtn.active ? Color.accent : Color.muted)
                   }
                   Text {
                     textFormat: Text.PlainText
-                    text: "Package Updates (" + parent.parent.pkgCount + ")"
+                    text: "Package Updates (" + tabPkgsBtn.pkgCount + ")"
                     font.pixelSize: 11
-                    font.weight: parent.parent.active ? Font.Bold : Font.Normal
-                    color: parent.parent.active ? Color.accent : Color.muted
+                    font.weight: tabFilesBtn.active ? Font.Bold : Font.Normal
+                    color: tabFilesBtn.active ? Color.accent : Color.muted
                   }
                   Rectangle {
                     visible: (root.activeDiffData && root.activeDiffData.hasCriticalPackages) === true
@@ -3523,6 +3527,7 @@ Item {
 
               // File summary chips (visible when files tab active)
               RowLayout {
+                id: fileSummaryRow
                 visible: diffModalCard.diffTab === "files"
                 spacing: 8
                 property var summary: (root.activeDiffData && root.activeDiffData.summary) || ({})
@@ -3535,7 +3540,7 @@ Item {
                     id: addSummaryText
                     anchors.centerIn: parent
                     textFormat: Text.PlainText
-                    text: "+" + (parent.parent.summary.added || 0) + " Added"
+                    text: "+" + (fileSummaryRow.summary.added || 0) + " Added"
                     font.pixelSize: 10
                     font.weight: Font.Medium
                     color: "#10B981"
@@ -3550,7 +3555,7 @@ Item {
                     id: modSummaryText
                     anchors.centerIn: parent
                     textFormat: Text.PlainText
-                    text: "~" + (parent.parent.summary.modified || 0) + " Modified"
+                    text: "~" + (fileSummaryRow.summary.modified || 0) + " Modified"
                     font.pixelSize: 10
                     font.weight: Font.Medium
                     color: "#F59E0B"
@@ -3565,7 +3570,7 @@ Item {
                     id: delSummaryText
                     anchors.centerIn: parent
                     textFormat: Text.PlainText
-                    text: "-" + (parent.parent.summary.deleted || 0) + " Deleted"
+                    text: "-" + (fileSummaryRow.summary.deleted || 0) + " Deleted"
                     font.pixelSize: 10
                     font.weight: Font.Medium
                     color: "#EF4444"
@@ -3788,7 +3793,7 @@ Item {
                       textFormat: Text.PlainText
                       text: modelData.path
                       font.pixelSize: 11
-                      font.family: Style.font.monospace
+                      font.family: Style.fontFamily
                       color: Color.foreground
                       Layout.fillWidth: true
                       elide: Text.ElideMiddle
@@ -4019,7 +4024,7 @@ Item {
                       textFormat: Text.PlainText
                       text: modelData.version || ""
                       font.pixelSize: 11
-                      font.family: Style.font.monospace
+                      font.family: Style.fontFamily
                       color: Color.muted
                     }
                   }
@@ -4576,7 +4581,7 @@ Item {
                   textFormat: Text.PlainText
                   text: root.activeRestoreFilePath
                   font.pixelSize: 12
-                  font.family: Style.font.monospace
+                  font.family: Style.fontFamily
                   font.weight: Font.Bold
                   color: Color.foreground
                   elide: Text.ElideMiddle
@@ -5320,6 +5325,7 @@ Item {
 
               // Health Status Badge
               Rectangle {
+                id: bootHealthBadge
                 implicitHeight: 22
                 implicitWidth: healthBadgeRow.implicitWidth + 12
                 radius: 11
@@ -5334,16 +5340,16 @@ Item {
                   spacing: 4
                   Text {
                     textFormat: Text.PlainText
-                    text: parent.parent.isHealthy ? "●" : "▲"
+                    text: bootHealthBadge.isHealthy ? "●" : "▲"
                     font.pixelSize: 8
-                    color: parent.parent.isHealthy ? "#10B981" : "#F59E0B"
+                    color: bootHealthBadge.isHealthy ? "#10B981" : "#F59E0B"
                   }
                   Text {
                     textFormat: Text.PlainText
                     text: (root.activeBootData && root.activeBootData.healthLabel) || "Checking..."
                     font.pixelSize: 10
                     font.weight: Font.Bold
-                    color: parent.parent.isHealthy ? "#10B981" : "#F59E0B"
+                    color: bootHealthBadge.isHealthy ? "#10B981" : "#F59E0B"
                   }
                 }
               }
