@@ -1,0 +1,11 @@
+{
+  // Omarchy Menu Extension: Snapshots & Recovery
+  // Adds quick launcher to the native Quickshell Super+Space menu.
+  "system.snapshots": {
+    "icon": "󰆼",
+    "label": "Snapshots & Recovery",
+    "description": "Btrfs & Snapper system recovery points, diffs, and boot health",
+    "aliases": ["snapshots", "snapper", "backup", "restore"],
+    "action": "omarchy-snapshots gui"
+  }
+}

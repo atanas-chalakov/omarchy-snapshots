@@ -23,6 +23,17 @@ rm -f "$HOME/.local/share/icons/hicolor/256x256/apps/omarchy-snapshots.png"
 rm -f "$HOME/.local/share/icons/hicolor/512x512/apps/omarchy-snapshots.png"
 rm -f "$HOME/.config/omarchy/plugins/$PLUGIN_ID"
 
+# 3. Clean up Omarchy Menu extension
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+if [[ -f "$SCRIPT_DIR/scripts/manage_menu_extension.py" ]]; then
+  python3 "$SCRIPT_DIR/scripts/manage_menu_extension.py" uninstall 2>/dev/null || true
+fi
+
+# 4. Remove local Pacman hook if installed and writable
+if [[ -w /etc/pacman.d/hooks/00-omarchy-snapshots-pre.hook ]]; then
+  rm -f /etc/pacman.d/hooks/00-omarchy-snapshots-pre.hook
+fi
+
 if command -v update-desktop-database >/dev/null 2>&1; then
   update-desktop-database "$HOME/.local/share/applications" 2>/dev/null || true
 fi

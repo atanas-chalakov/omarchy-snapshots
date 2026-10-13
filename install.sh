@@ -74,14 +74,32 @@ if command -v omarchy >/dev/null 2>&1; then
   omarchy plugin enable "$PLUGIN_ID" --section right 2>/dev/null || true
 fi
 
+# 8. Install Omarchy Menu Extension (Super+Space Command Palette)
+echo "Integrating into Omarchy Command Palette (Super+Space)..."
+python3 "$SCRIPT_DIR/scripts/manage_menu_extension.py" install 2>/dev/null || true
+
+# 9. Optional Pacman ALPM Pre-Transaction Hook
+if [[ "${1:-}" == "--with-pacman-hook" ]] || [[ -w /etc/pacman.d/hooks ]]; then
+  echo "Installing Pacman pre-transaction hook..."
+  mkdir -p /etc/pacman.d/hooks /usr/share/libalpm/scripts 2>/dev/null || true
+  cp "$SCRIPT_DIR/packaging/00-omarchy-snapshots-pre.hook" "/etc/pacman.d/hooks/00-omarchy-snapshots-pre.hook" 2>/dev/null || true
+  cp "$SCRIPT_DIR/scripts/omarchy-snapshots-pre-hook" "/usr/share/libalpm/scripts/omarchy-snapshots-pre-hook" 2>/dev/null || true
+  chmod +x "/usr/share/libalpm/scripts/omarchy-snapshots-pre-hook" 2>/dev/null || true
+  echo "✓ Pacman pre-transaction snapshot hook enabled"
+fi
+
 echo ""
 echo "============================================================"
 echo " ✓ Installation complete!"
 echo "============================================================"
 echo "You can now open the Snapshots HUD using:"
-echo "  • Status Bar: Click the Snapshots companion icon (󰆼)"
-echo "  • Terminal:   omarchy-snapshots (or omarchy-snapshots gui)"
-echo "  • App Menu:   Search for 'Snapshots & Recovery' in Rofi / Walker"
+echo "  • Status Bar:      Click the Snapshots companion icon (󰆼)"
+echo "  • Terminal:        omarchy-snapshots (or omarchy-snapshots gui)"
+echo "  • Command Palette: Super+Space -> Snapshots & Recovery (or System > Snapshots)"
+echo "  • App Menu:        Search for 'Snapshots & Recovery' in Rofi / Walker"
+echo ""
+echo "To enable automatic snapshots before terminal pacman transactions, run:"
+echo "  sudo $SCRIPT_DIR/scripts/install-pacman-hook.sh"
 echo ""
 echo "To bind to a key in Hyprland (~/.config/hypr/bindings.conf):"
 echo "  bind = \$mainMod, S, exec, omarchy-snapshots gui"

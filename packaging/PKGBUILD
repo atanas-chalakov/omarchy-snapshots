@@ -28,11 +28,15 @@ package() {
     # Install plugin files
     local plugindir="$pkgdir/usr/share/omarchy/plugins/ac.snapshots"
     install -dm755 "$plugindir"
-    cp -r BarWidget.qml SnapshotsHUD.qml manifest.json plugin.json assets bin "$plugindir/"
+    cp -r BarWidget.qml SnapshotsHUD.qml manifest.json plugin.json assets bin scripts "$plugindir/"
 
     # Install CLI launchers
     install -Dm755 bin/omarchy-snapshots "$pkgdir/usr/bin/omarchy-snapshots"
     install -Dm755 bin/omarchy-snapshots-core "$pkgdir/usr/bin/omarchy-snapshots-core"
+
+    # Install ALPM pacman pre-transaction hook
+    install -Dm644 packaging/00-omarchy-snapshots-pre.hook "$pkgdir/usr/share/libalpm/hooks/00-omarchy-snapshots-pre.hook"
+    install -Dm755 scripts/omarchy-snapshots-pre-hook "$pkgdir/usr/share/libalpm/scripts/omarchy-snapshots-pre-hook"
 
     # Install Freedesktop desktop entry
     install -Dm644 omarchy-snapshots.desktop "$pkgdir/usr/share/applications/omarchy-snapshots.desktop"
@@ -48,6 +52,7 @@ package() {
     # Install license
     install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
 
-    # Install documentation
+    # Install documentation and extension template
     install -Dm644 README.md "$pkgdir/usr/share/doc/$pkgname/README.md"
+    install -Dm644 packaging/omarchy-menu-extension.jsonc "$pkgdir/usr/share/doc/$pkgname/omarchy-menu-extension.jsonc"
 }

@@ -1,0 +1,13 @@
+[Trigger]
+Operation = Upgrade
+Operation = Install
+Operation = Remove
+Type = Package
+Target = *
+
+[Action]
+Description = Creating pre-transaction system snapshot...
+When = PreTransaction
+Exec = /usr/share/libalpm/scripts/omarchy-snapshots-pre-hook
+NeedsTargets
+AbortOnFail

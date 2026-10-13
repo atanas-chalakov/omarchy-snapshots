@@ -91,11 +91,28 @@ git clone https://github.com/atanas-chalakov/omarchy-snapshots.git
 cd omarchy-snapshots
 ./install.sh
 ```
-This automatically symlinks the plugin into `~/.config/omarchy/plugins/ac.snapshots`, links CLI launchers into `~/.local/bin`, installs application menu entries and icons, and enables the companion widget in your Omarchy status bar.
+This automatically:
+- Symlinks the plugin into `~/.config/omarchy/plugins/ac.snapshots`
+- Links CLI launchers into `~/.local/bin`
+- Integrates Snapshots & Recovery into the native **Omarchy Command Palette** (`Super+Space`) via `~/.config/omarchy/extensions/omarchy-menu.jsonc`
+- Installs application menu entries and vector/PNG icons
+- Enables the companion widget in your Omarchy status bar
+
+#### Automatic Pre-Upgrade Snapshots (Pacman ALPM Hook)
+To ensure every `pacman -Syu`, install, or package removal automatically captures a safety snapshot before modifying system files, enable the pre-transaction ALPM hook:
+```bash
+sudo ./scripts/install-pacman-hook.sh
+```
+To verify hook status:
+```bash
+omarchy-snapshots hook
+```
 
 To uninstall at any time:
 ```bash
 ./uninstall.sh
+# To also remove the pacman hook:
+sudo ./scripts/uninstall-pacman-hook.sh
 ```
 
 ### Method 2: Arch Linux (AUR / PKGBUILD)
@@ -103,10 +120,24 @@ To uninstall at any time:
 cd packaging
 makepkg -si
 ```
+*(The PKGBUILD automatically installs `/usr/share/libalpm/hooks/00-omarchy-snapshots-pre.hook` and the menu extension template).*
 
 ### Method 3: Using the Omarchy CLI
 ```bash
 omarchy plugin add https://github.com/atanas-chalakov/omarchy-snapshots --enable
+```
+
+---
+
+## Omarchy Command Palette Integration (`Super+Space`)
+
+`omarchy-snapshots` includes first-class integration with the native Quickshell Omarchy command palette (`Super+Space`). You can summon it anytime:
+- Press <kbd>Super</kbd> + <kbd>Space</kbd> and type `snapshots`, `snapper`, `backup`, or `restore`
+- Or navigate hierarchically: **System** → **Snapshots & Recovery** (or **Setup** → **Snapshots & Recovery**)
+
+Check or refresh your menu extension configuration anytime:
+```bash
+omarchy-snapshots menu
 ```
 
 ---
@@ -148,6 +179,18 @@ omarchy-snapshots delete --id 17
 
 # Restore / rollback system to a snapshot
 omarchy-snapshots restore --id 19
+
+# Verify Limine bootloader health & registered snapshot entries
+omarchy-snapshots boot-health
+
+# Synchronize Limine bootloader with Snapper snapshots
+omarchy-snapshots boot-sync
+
+# Check status of automatic pacman pre-transaction hook
+omarchy-snapshots hook
+
+# Check Omarchy command palette menu extension status
+omarchy-snapshots menu
 
 # One-time authorization for passwordless desktop access
 omarchy-snapshots authorize

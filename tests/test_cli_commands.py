@@ -193,5 +193,16 @@ class TestCliCommands(unittest.TestCase):
         self.assertEqual(res.returncode, 0)
         self.assertIn("Simulated Limine bootloader sync completed successfully", res.stdout)
 
+    def test_cli_hook_command(self):
+        res = self.run_cmd(CLI_BIN, ["hook"])
+        self.assertIn(res.returncode, [0, 1])
+        output = res.stdout + res.stderr
+        self.assertTrue("Pacman Pre-Transaction" in output or "install-pacman-hook.sh" in output)
+
+    def test_cli_menu_command(self):
+        res = self.run_cmd(CLI_BIN, ["menu"])
+        self.assertEqual(res.returncode, 0)
+        self.assertIn("Active in", res.stdout)
+
 if __name__ == "__main__":
     unittest.main()

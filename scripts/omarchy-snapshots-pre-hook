@@ -1,0 +1,62 @@
+#!/usr/bin/env bash
+# omarchy-snapshots-pre-hook: ALPM pre-transaction hook script
+# Automatically captures a Btrfs Snapper snapshot prior to pacman transactions.
+
+set -uo pipefail
+
+# 1. Skip if already triggered by omarchy update (which captures its own snapshot)
+if [[ "${OMARCHY_UPDATE_PACMAN:-}" == "1" ]]; then
+  exit 0
+fi
+
+# 2. Skip if direct pacman operations explicitly request bypass
+if [[ "${OMARCHY_SNAPSHOT_DISABLE:-}" == "1" ]]; then
+  exit 0
+fi
+
+# 3. Check if snapper is available
+if ! command -v snapper >/dev/null 2>&1; then
+  exit 0
+fi
+
+# 4. Check if root is on btrfs
+root_fstype="$(findmnt -no FSTYPE / 2>/dev/null || echo "")"
+if [[ "$root_fstype" != "btrfs" ]]; then
+  exit 0
+fi
+
+# 5. Discover configured snapper configs (typically 'root')
+mapfile -t CONFIGS < <(snapper --csvout list-configs 2>/dev/null | awk -F, 'NR>1 {print $1}')
+if (( ${#CONFIGS[@]} == 0 )); then
+  # No configs configured; quietly exit so pacman is not blocked
+  exit 0
+fi
+
+# 6. Read package targets from stdin (provided by ALPM NeedsTargets)
+targets=()
+while IFS= read -r line; do
+  [[ -n "$line" ]] && targets+=("$line")
+done
+
+count=${#targets[@]}
+if (( count == 0 )); then
+  desc="pacman pre-transaction checkpoint"
+elif (( count == 1 )); then
+  desc="pacman pre: ${targets[0]}"
+elif (( count <= 3 )); then
+  joined="$(IFS=', '; echo "${targets[*]}")"
+  desc="pacman pre: $joined"
+else
+  desc="pacman pre: ${targets[0]}, ${targets[1]} +$((count - 2)) packages"
+fi
+
+echo ":: Creating pre-transaction system snapshot ($desc)..." >&2
+
+for cfg in "${CONFIGS[@]}"; do
+  # Create standard numbered snapshot with pacman description
+  snapper -c "$cfg" create -c number -d "$desc" -u "pacman=yes,packageCount=$count" 2>/dev/null || {
+    echo ":: Warning: Failed to create snapshot for subvolume config '$cfg'; continuing transaction." >&2
+  }
+done
+
+exit 0

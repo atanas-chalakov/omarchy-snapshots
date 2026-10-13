@@ -7,7 +7,8 @@ post_install() {
     fi
 
     echo "==> omarchy-snapshots installed successfully!"
-    echo "==> Launch with 'omarchy-snapshots' from terminal or application launcher."
+    echo "==> Launch with 'omarchy-snapshots' from terminal or Super+Space menu."
+    echo "==> Pre-transaction ALPM snapshot hook active at /usr/share/libalpm/hooks/00-omarchy-snapshots-pre.hook"
 }
 
 post_upgrade() {

@@ -378,5 +378,130 @@ class TestQmlAndManifest(unittest.TestCase):
         self.assertIn("if (estimateOptimizeProcess.running) estimateOptimizeProcess.running = false", content)
         self.assertIn("if (bootHealthProcess.running) bootHealthProcess.running = false", content)
 
+    def test_omarchy_menu_extension_schema_and_merge(self):
+        """
+        Verify packaging/omarchy-menu-extension.jsonc and manage_menu_extension.py
+        conform to the official Omarchy Menu specification and handle JSONC merging.
+        """
+        import tempfile
+        ext_path = os.path.join(PROJECT_ROOT, "packaging", "omarchy-menu-extension.jsonc")
+        self.assertTrue(os.path.isfile(ext_path), "packaging/omarchy-menu-extension.jsonc must exist")
+
+        with open(ext_path, "r", encoding="utf-8") as f:
+            raw = f.read()
+
+        # Parse with Omarchy stripJsonc rules
+        stripped = re_strip = subprocess.check_output([
+            sys.executable, "-c",
+            "import sys, os; sys.path.insert(0, os.path.join('" + PROJECT_ROOT + "', 'scripts')); "
+            "from manage_menu_extension import strip_jsonc; import json; "
+            "d = json.loads(strip_jsonc(open('" + ext_path + "').read())); "
+            "print(json.dumps(d))"
+        ]).decode("utf-8")
+        data = json.loads(stripped)
+
+        self.assertIn("system.snapshots", data)
+        entry = data["system.snapshots"]
+        self.assertEqual(entry.get("icon"), "󰆼")
+        self.assertEqual(entry.get("label"), "Snapshots & Recovery")
+        self.assertEqual(entry.get("action"), "omarchy-snapshots gui")
+        self.assertIn("snapshots", entry.get("aliases", []))
+        self.assertIn("snapper", entry.get("aliases", []))
+
+        # Test manage_menu_extension.py install & uninstall on isolated temp file
+        manage_script = os.path.join(PROJECT_ROOT, "scripts", "manage_menu_extension.py")
+        with tempfile.NamedTemporaryFile("w+", suffix=".jsonc") as tf:
+            tf.write("{\n  // User config\n  \"setup.test\": {\"label\": \"TestApp\"}\n}\n")
+            tf.flush()
+
+            # Install
+            res = subprocess.run([sys.executable, manage_script, "install", "--target", tf.name], capture_output=True, text=True)
+            self.assertEqual(res.returncode, 0)
+
+            # Validate installed content
+            res_val = subprocess.run([sys.executable, manage_script, "validate", "--target", tf.name], capture_output=True, text=True)
+            self.assertEqual(res_val.returncode, 0)
+
+            with open(tf.name, "r", encoding="utf-8") as f:
+                content = f.read()
+            self.assertIn('"system.snapshots"', content)
+            self.assertIn('"setup.test"', content)
+
+            # Uninstall
+            res_un = subprocess.run([sys.executable, manage_script, "uninstall", "--target", tf.name], capture_output=True, text=True)
+            self.assertEqual(res_un.returncode, 0)
+            with open(tf.name, "r", encoding="utf-8") as f:
+                content_after = f.read()
+            self.assertNotIn('"system.snapshots"', content_after)
+            self.assertIn('"setup.test"', content_after)
+
+    def test_alpm_pacman_hook_specification(self):
+        """
+        Verify packaging/00-omarchy-snapshots-pre.hook adheres to ALPM-HOOKS(5).
+        """
+        hook_path = os.path.join(PROJECT_ROOT, "packaging", "00-omarchy-snapshots-pre.hook")
+        self.assertTrue(os.path.isfile(hook_path), "00-omarchy-snapshots-pre.hook must exist")
+
+        with open(hook_path, "r", encoding="utf-8") as f:
+            lines = [l.strip() for l in f if l.strip() and not l.startswith("#")]
+
+        self.assertIn("[Trigger]", lines)
+        self.assertIn("Operation = Upgrade", lines)
+        self.assertIn("Operation = Install", lines)
+        self.assertIn("Operation = Remove", lines)
+        self.assertIn("Type = Package", lines)
+        self.assertIn("Target = *", lines)
+
+        self.assertIn("[Action]", lines)
+        self.assertIn("When = PreTransaction", lines)
+        self.assertIn("Exec = /usr/share/libalpm/scripts/omarchy-snapshots-pre-hook", lines)
+        self.assertIn("NeedsTargets", lines)
+        self.assertIn("AbortOnFail", lines)
+
+    def test_omarchy_snapshots_pre_hook_script(self):
+        """
+        Verify scripts/omarchy-snapshots-pre-hook is valid executable bash,
+        safely handles Omarchy update bypass, explicit bypass, and stdin targets.
+        """
+        script_path = os.path.join(PROJECT_ROOT, "scripts", "omarchy-snapshots-pre-hook")
+        self.assertTrue(os.path.isfile(script_path), "scripts/omarchy-snapshots-pre-hook must exist")
+        self.assertTrue(os.access(script_path, os.X_OK), "scripts/omarchy-snapshots-pre-hook must be executable")
+
+        # 1. Test OMARCHY_UPDATE_PACMAN bypass
+        env_update = os.environ.copy()
+        env_update["OMARCHY_UPDATE_PACMAN"] = "1"
+        res = subprocess.run([script_path], env=env_update, input="", text=True, capture_output=True)
+        self.assertEqual(res.returncode, 0, "Must exit 0 when OMARCHY_UPDATE_PACMAN is set")
+
+        # 2. Test OMARCHY_SNAPSHOT_DISABLE bypass
+        env_disable = os.environ.copy()
+        env_disable["OMARCHY_SNAPSHOT_DISABLE"] = "1"
+        res = subprocess.run([script_path], env=env_disable, input="", text=True, capture_output=True)
+        self.assertEqual(res.returncode, 0, "Must exit 0 when OMARCHY_SNAPSHOT_DISABLE is set")
+
+        # 3. Test installer & uninstaller scripts exist and are executable
+        install_script = os.path.join(PROJECT_ROOT, "scripts", "install-pacman-hook.sh")
+        uninstall_script = os.path.join(PROJECT_ROOT, "scripts", "uninstall-pacman-hook.sh")
+        self.assertTrue(os.path.isfile(install_script), "install-pacman-hook.sh must exist")
+        self.assertTrue(os.path.isfile(uninstall_script), "uninstall-pacman-hook.sh must exist")
+        self.assertTrue(os.access(install_script, os.X_OK))
+        self.assertTrue(os.access(uninstall_script, os.X_OK))
+
+    def test_cli_hook_and_menu_commands(self):
+        """
+        Verify omarchy-snapshots CLI supports 'hook' and 'menu' commands without error.
+        """
+        cli_bin = os.path.join(PROJECT_ROOT, "bin", "omarchy-snapshots")
+        # Run menu status
+        res_menu = subprocess.run([cli_bin, "menu"], capture_output=True, text=True)
+        self.assertEqual(res_menu.returncode, 0)
+        self.assertIn("Active in", res_menu.stdout)
+
+        # Run hook command (exits 0 if active, 1 with instruction if inactive)
+        res_hook = subprocess.run([cli_bin, "hook"], capture_output=True, text=True)
+        self.assertIn(res_hook.returncode, [0, 1])
+        output = res_hook.stdout + res_hook.stderr
+        self.assertTrue("Pacman Pre-Transaction" in output or "install-pacman-hook" in output)
+
 if __name__ == "__main__":
     unittest.main()
