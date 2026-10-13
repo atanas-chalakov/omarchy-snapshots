@@ -63,6 +63,87 @@ Item {
   property var activeBootData: null
   property bool isSyncingBoot: false
 
+  // Global modal state tracker
+  readonly property bool anyModalOpen: showCreateModal
+    || showDiffModal
+    || showRestoreModal
+    || showDeleteModal
+    || showRestoreFileModal
+    || showOptimizeModal
+    || showBootModal
+
+  onShowCreateModalChanged: {
+    if (showCreateModal) {
+      Qt.callLater(function() {
+        if (typeof createDescInput !== "undefined") createDescInput.forceActiveFocus()
+        else if (typeof createModalCard !== "undefined") createModalCard.forceActiveFocus()
+      })
+    } else {
+      if (keyCatcher) keyCatcher.forceActiveFocus()
+    }
+  }
+
+  onShowDiffModalChanged: {
+    if (showDiffModal) {
+      Qt.callLater(function() {
+        if (typeof diffFilterInput !== "undefined") diffFilterInput.forceActiveFocus()
+        else if (typeof diffModalCard !== "undefined") diffModalCard.forceActiveFocus()
+      })
+    } else {
+      if (keyCatcher) keyCatcher.forceActiveFocus()
+    }
+  }
+
+  onShowRestoreModalChanged: {
+    if (showRestoreModal) {
+      Qt.callLater(function() {
+        if (typeof restoreModalCard !== "undefined") restoreModalCard.forceActiveFocus()
+      })
+    } else {
+      if (keyCatcher) keyCatcher.forceActiveFocus()
+    }
+  }
+
+  onShowDeleteModalChanged: {
+    if (showDeleteModal) {
+      Qt.callLater(function() {
+        if (typeof deleteModalCard !== "undefined") deleteModalCard.forceActiveFocus()
+      })
+    } else {
+      if (keyCatcher) keyCatcher.forceActiveFocus()
+    }
+  }
+
+  onShowRestoreFileModalChanged: {
+    if (showRestoreFileModal) {
+      Qt.callLater(function() {
+        if (typeof restoreFileModalCard !== "undefined") restoreFileModalCard.forceActiveFocus()
+      })
+    } else {
+      if (keyCatcher) keyCatcher.forceActiveFocus()
+    }
+  }
+
+  onShowOptimizeModalChanged: {
+    if (showOptimizeModal) {
+      Qt.callLater(function() {
+        if (typeof optimizeModalCard !== "undefined") optimizeModalCard.forceActiveFocus()
+      })
+    } else {
+      if (keyCatcher) keyCatcher.forceActiveFocus()
+    }
+  }
+
+  onShowBootModalChanged: {
+    if (showBootModal) {
+      Qt.callLater(function() {
+        if (typeof bootModalCard !== "undefined") bootModalCard.forceActiveFocus()
+      })
+    } else {
+      if (keyCatcher) keyCatcher.forceActiveFocus()
+    }
+  }
+
   function notify(msg) {
     statusNotification = msg
     notifyTimer.restart()
@@ -750,6 +831,21 @@ Item {
       Item {
         id: navKeyHandler
         Keys.onPressed: function(event) {
+          if (root.anyModalOpen) {
+            if (event.key === Qt.Key_Escape) {
+              if (root.showDiffModal) root.showDiffModal = false
+              else if (root.showCreateModal) root.showCreateModal = false
+              else if (root.showRestoreModal) root.showRestoreModal = false
+              else if (root.showDeleteModal) root.showDeleteModal = false
+              else if (root.showRestoreFileModal) root.showRestoreFileModal = false
+              else if (root.showOptimizeModal) { if (!root.isOptimizing) root.showOptimizeModal = false }
+              else if (root.showBootModal) { if (!root.isSyncingBoot) root.showBootModal = false }
+              if (keyCatcher) keyCatcher.forceActiveFocus()
+              event.accepted = true
+            }
+            return
+          }
+
           if (event.key === Qt.Key_Home) {
             if (root.filteredSnapshots.length > 0) {
               root.selectedIndex = 0
@@ -793,12 +889,10 @@ Item {
             if (root.selectedSnapshot) root.togglePin(root.selectedSnapshot.id, root.selectedSnapshot.important)
             event.accepted = true
           } else if (event.key === Qt.Key_R) {
-            if (root.showRestoreModal) root.executeRestore()
-            else if (root.selectedSnapshot) root.confirmRestore(root.selectedSnapshot)
+            if (root.selectedSnapshot) root.confirmRestore(root.selectedSnapshot)
             event.accepted = true
           } else if (event.key === Qt.Key_X) {
-            if (root.showDeleteModal) root.executeDelete()
-            else if (root.selectedSnapshot) root.confirmDelete(root.selectedSnapshot)
+            if (root.selectedSnapshot) root.confirmDelete(root.selectedSnapshot)
             event.accepted = true
           } else if (event.key === Qt.Key_F || event.key === Qt.Key_Slash) {
             searchInput.forceActiveFocus()
@@ -825,49 +919,13 @@ Item {
           } else if (event.key === Qt.Key_L) {
             root.openBootModal()
             event.accepted = true
-          } else if (event.key === Qt.Key_S) {
-            if (root.showBootModal) root.executeBootSync()
-            event.accepted = true
           } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
-            if (root.showRestoreModal) {
-              root.executeRestore()
-            } else if (root.showDeleteModal) {
-              root.executeDelete()
-            } else if (root.showRestoreFileModal) {
-              root.executeRestoreFile()
-            } else if (root.showOptimizeModal) {
-              root.executeOptimize()
-            } else if (root.showBootModal) {
-              root.executeBootSync()
-            } else if (root.selectedSnapshot) {
+            if (root.selectedSnapshot) {
               root.inspectDiff(root.selectedSnapshot.id)
             }
             event.accepted = true
           } else if (event.key === Qt.Key_Escape || event.key === Qt.Key_Q) {
-            if (root.showDiffModal) {
-              root.showDiffModal = false
-              keyCatcher.forceActiveFocus()
-            } else if (root.showCreateModal) {
-              root.showCreateModal = false
-              keyCatcher.forceActiveFocus()
-            } else if (root.showRestoreModal) {
-              root.showRestoreModal = false
-              keyCatcher.forceActiveFocus()
-            } else if (root.showDeleteModal) {
-              root.showDeleteModal = false
-              keyCatcher.forceActiveFocus()
-            } else if (root.showRestoreFileModal) {
-              root.showRestoreFileModal = false
-              keyCatcher.forceActiveFocus()
-            } else if (root.showOptimizeModal) {
-              root.showOptimizeModal = false
-              keyCatcher.forceActiveFocus()
-            } else if (root.showBootModal) {
-              root.showBootModal = false
-              keyCatcher.forceActiveFocus()
-            } else {
-              root.dismiss()
-            }
+            root.dismiss()
             event.accepted = true
           }
         }
@@ -880,11 +938,13 @@ Item {
         focus: true
         Keys.priority: Keys.BeforeItem
         Keys.forwardTo: [navKeyHandler]
-        blocked: (searchInput && searchInput.activeFocus)
+        blocked: root.anyModalOpen
+          || (searchInput && searchInput.activeFocus)
           || (typeof createDescInput !== "undefined" && createDescInput.activeFocus)
           || (typeof diffFilterInput !== "undefined" && diffFilterInput.activeFocus)
 
         onMoveRequested: function(dx, dy) {
+          if (root.anyModalOpen) return
           if (dy > 0) root.selectNext()
           else if (dy < 0) root.selectPrev()
           else if (dx > 0) root.cycleFilter(1)
@@ -892,13 +952,8 @@ Item {
         }
 
         onActivateRequested: function() {
-          if (root.showRestoreModal) {
-            root.executeRestore()
-          } else if (root.showDeleteModal) {
-            root.executeDelete()
-          } else if (root.selectedSnapshot) {
-            root.inspectDiff(root.selectedSnapshot.id)
-          }
+          if (root.anyModalOpen) return
+          if (root.selectedSnapshot) root.inspectDiff(root.selectedSnapshot.id)
         }
 
         onCloseRequested: function() {
@@ -918,11 +973,15 @@ Item {
             root.showRestoreFileModal = false
             keyCatcher.forceActiveFocus()
           } else if (root.showOptimizeModal) {
-            root.showOptimizeModal = false
-            keyCatcher.forceActiveFocus()
+            if (!root.isOptimizing) {
+              root.showOptimizeModal = false
+              keyCatcher.forceActiveFocus()
+            }
           } else if (root.showBootModal) {
-            root.showBootModal = false
-            keyCatcher.forceActiveFocus()
+            if (!root.isSyncingBoot) {
+              root.showBootModal = false
+              keyCatcher.forceActiveFocus()
+            }
           } else if (searchInput && searchInput.text.length > 0) {
             searchInput.text = ""
             keyCatcher.forceActiveFocus()
@@ -932,14 +991,12 @@ Item {
         }
 
         onDeleteRequested: function() {
-          if (root.showDeleteModal) {
-            root.executeDelete()
-          } else if (root.selectedSnapshot) {
-            root.confirmDelete(root.selectedSnapshot)
-          }
+          if (root.anyModalOpen) return
+          if (root.selectedSnapshot) root.confirmDelete(root.selectedSnapshot)
         }
 
         onTextKey: function(key, modifiers) {
+          if (root.anyModalOpen) return
           var k = String(key || "").toLowerCase()
           if (k === "c" || k === "n") {
             root.openCreateModal()
@@ -950,12 +1007,9 @@ Item {
           } else if (k === "p") {
             if (root.selectedSnapshot) root.togglePin(root.selectedSnapshot.id, root.selectedSnapshot.important)
           } else if (k === "r") {
-            if (root.showRestoreModal) root.executeRestore()
-            else if (root.selectedSnapshot) root.confirmRestore(root.selectedSnapshot)
+            if (root.selectedSnapshot) root.confirmRestore(root.selectedSnapshot)
           } else if (k === "l") {
             root.openBootModal()
-          } else if (k === "s") {
-            if (root.showBootModal) root.executeBootSync()
           } else if (k === "o") {
             root.openOptimizeModal()
           } else if (k === "f" || key === "/") {
@@ -964,30 +1018,7 @@ Item {
           } else if (k === "g") {
             root.refresh()
           } else if (k === "q") {
-            if (root.showDiffModal) {
-              root.showDiffModal = false
-              keyCatcher.forceActiveFocus()
-            } else if (root.showCreateModal) {
-              root.showCreateModal = false
-              keyCatcher.forceActiveFocus()
-            } else if (root.showRestoreModal) {
-              root.showRestoreModal = false
-              keyCatcher.forceActiveFocus()
-            } else if (root.showDeleteModal) {
-              root.showDeleteModal = false
-              keyCatcher.forceActiveFocus()
-            } else if (root.showRestoreFileModal) {
-              root.showRestoreFileModal = false
-              keyCatcher.forceActiveFocus()
-            } else if (root.showOptimizeModal) {
-              root.showOptimizeModal = false
-              keyCatcher.forceActiveFocus()
-            } else if (root.showBootModal) {
-              root.showBootModal = false
-              keyCatcher.forceActiveFocus()
-            } else {
-              root.dismiss()
-            }
+            root.dismiss()
           } else if (key === "1") {
             root.currentFilter = "all"
           } else if (key === "2") {
@@ -2774,6 +2805,7 @@ Item {
         }
 
         Rectangle {
+          id: createModalCard
           anchors.centerIn: parent
           width: 500
           implicitHeight: createModalCol.implicitHeight + 40
@@ -2781,6 +2813,20 @@ Item {
           color: Color.background
           border.color: Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.35)
           border.width: 1.5
+          focus: root.showCreateModal
+
+          Keys.onEscapePressed: {
+            root.showCreateModal = false
+            if (keyCatcher) keyCatcher.forceActiveFocus()
+          }
+          Keys.onReturnPressed: {
+            root.submitCreateSnapshot()
+            if (keyCatcher) keyCatcher.forceActiveFocus()
+          }
+          Keys.onEnterPressed: {
+            root.submitCreateSnapshot()
+            if (keyCatcher) keyCatcher.forceActiveFocus()
+          }
 
           MouseArea { anchors.fill: parent }
 
@@ -2846,7 +2892,7 @@ Item {
                 ]
                 Rectangle {
                   implicitHeight: 24
-                  implicitWidth: chipPresetText.implicitWidth + 16
+                  implicitWidth: chipPresetLayout.implicitWidth + 16
                   radius: 12
                   color: presetHover.containsMouse ? Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.15) : Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.05)
                   border.color: presetHover.containsMouse ? Color.accent : Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.12)
@@ -2864,13 +2910,31 @@ Item {
                     }
                   }
 
-                  Text {
-                    id: chipPresetText
+                  RowLayout {
+                    id: chipPresetLayout
                     anchors.centerIn: parent
-                    text: modelData
-                    font.pixelSize: 10
-                    font.weight: Font.Medium
-                    color: presetHover.containsMouse ? Color.accent : Color.muted
+                    spacing: 4
+                    Rectangle {
+                      implicitHeight: 14
+                      implicitWidth: altNumTxt.implicitWidth + 6
+                      radius: 3
+                      color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.08)
+                      Text {
+                        id: altNumTxt
+                        anchors.centerIn: parent
+                        text: "Alt+" + (index + 1)
+                        font.pixelSize: 8
+                        font.weight: Font.Bold
+                        color: presetHover.containsMouse ? Color.accent : Color.muted
+                      }
+                    }
+                    Text {
+                      id: chipPresetText
+                      text: modelData
+                      font.pixelSize: 10
+                      font.weight: Font.Medium
+                      color: presetHover.containsMouse ? Color.accent : Color.muted
+                    }
                   }
                 }
               }
@@ -2915,6 +2979,25 @@ Item {
                   Keys.onEscapePressed: {
                     root.showCreateModal = false
                     keyCatcher.forceActiveFocus()
+                  }
+                  Keys.onPressed: function(event) {
+                    if ((event.modifiers & Qt.ControlModifier || event.modifiers & Qt.AltModifier) && event.key === Qt.Key_P) {
+                      root.newSnapshotImportant = !root.newSnapshotImportant
+                      event.accepted = true
+                      return
+                    }
+                    if (event.modifiers & Qt.AltModifier) {
+                      var presets = ["Before Update", "Config Tweak", "Driver Test", "Clean State"]
+                      if (event.key >= Qt.Key_1 && event.key <= Qt.Key_4) {
+                        var idx = event.key - Qt.Key_1
+                        if (idx < presets.length) {
+                          createDescInput.text = presets[idx]
+                          root.newSnapshotDesc = presets[idx]
+                          event.accepted = true
+                          return
+                        }
+                      }
+                    }
                   }
 
                   Text {
@@ -2984,6 +3067,22 @@ Item {
                   font.pixelSize: 11
                   font.weight: root.newSnapshotImportant ? Font.DemiBold : Font.Normal
                   color: root.newSnapshotImportant ? "#FDE047" : Color.foreground
+                }
+                Rectangle {
+                  implicitHeight: 16
+                  implicitWidth: pinShortcutTxt.implicitWidth + 8
+                  radius: 3
+                  color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.08)
+                  border.color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.15)
+                  border.width: 1
+                  Text {
+                    id: pinShortcutTxt
+                    anchors.centerIn: parent
+                    text: "Ctrl+P"
+                    font.pixelSize: 8
+                    font.weight: Font.Bold
+                    color: root.newSnapshotImportant ? "#FDE047" : Color.muted
+                  }
                 }
               }
             }
@@ -3238,7 +3337,7 @@ Item {
               Item { Layout.fillWidth: true }
 
               RowLayout {
-                spacing: 5
+                spacing: 8
                 Rectangle {
                   implicitHeight: 16
                   implicitWidth: tabKeyTxt.implicitWidth + 8
@@ -3257,6 +3356,98 @@ Item {
                 }
                 Text {
                   text: "Switch View"
+                  font.pixelSize: 10
+                  color: Color.muted
+                }
+
+                Rectangle {
+                  implicitHeight: 16
+                  implicitWidth: navKeyTxt.implicitWidth + 8
+                  radius: 3
+                  color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.08)
+                  border.color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.15)
+                  border.width: 1
+                  Text {
+                    id: navKeyTxt
+                    anchors.centerIn: parent
+                    text: "↓/↑"
+                    font.pixelSize: 8
+                    font.weight: Font.Bold
+                    color: Color.muted
+                  }
+                }
+                Text {
+                  text: "Navigate"
+                  font.pixelSize: 10
+                  color: Color.muted
+                }
+
+                RowLayout {
+                  visible: diffModalCard.diffTab === "files"
+                  spacing: 4
+                  Rectangle {
+                    implicitHeight: 16
+                    implicitWidth: rDiffKeyTxt.implicitWidth + 8
+                    radius: 3
+                    color: Qt.rgba(0.06, 0.72, 0.51, 0.15)
+                    border.color: Qt.rgba(0.06, 0.72, 0.51, 0.3)
+                    border.width: 1
+                    Text {
+                      id: rDiffKeyTxt
+                      anchors.centerIn: parent
+                      text: "R / ↵"
+                      font.pixelSize: 8
+                      font.weight: Font.Bold
+                      color: "#10B981"
+                    }
+                  }
+                  Text {
+                    text: "Restore File"
+                    font.pixelSize: 10
+                    color: "#10B981"
+                  }
+                }
+
+                Rectangle {
+                  implicitHeight: 16
+                  implicitWidth: filterKeyTxt.implicitWidth + 8
+                  radius: 3
+                  color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.08)
+                  border.color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.15)
+                  border.width: 1
+                  Text {
+                    id: filterKeyTxt
+                    anchors.centerIn: parent
+                    text: "/"
+                    font.pixelSize: 8
+                    font.weight: Font.Bold
+                    color: Color.muted
+                  }
+                }
+                Text {
+                  text: "Filter"
+                  font.pixelSize: 10
+                  color: Color.muted
+                }
+
+                Rectangle {
+                  implicitHeight: 16
+                  implicitWidth: escDiffKeyTxt.implicitWidth + 8
+                  radius: 3
+                  color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.08)
+                  border.color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.15)
+                  border.width: 1
+                  Text {
+                    id: escDiffKeyTxt
+                    anchors.centerIn: parent
+                    text: "Esc"
+                    font.pixelSize: 8
+                    font.weight: Font.Bold
+                    color: Color.muted
+                  }
+                }
+                Text {
+                  text: "Close"
                   font.pixelSize: 10
                   color: Color.muted
                 }
@@ -3359,7 +3550,29 @@ Item {
                   Keys.onEscapePressed: {
                     if (text.length > 0) text = ""
                     else root.showDiffModal = false
-                    keyCatcher.forceActiveFocus()
+                    if (keyCatcher) keyCatcher.forceActiveFocus()
+                  }
+                  Keys.onTabPressed: function(event) {
+                    diffModalCard.diffTab = (diffModalCard.diffTab === "files") ? "packages" : "files"
+                    event.accepted = true
+                  }
+                  Keys.onBacktabPressed: function(event) {
+                    diffModalCard.diffTab = (diffModalCard.diffTab === "files") ? "packages" : "files"
+                    event.accepted = true
+                  }
+                  Keys.onDownPressed: function(event) {
+                    if (diffModalCard.diffTab === "files") {
+                      if (diffFilesList.count > 0) {
+                        diffFilesList.currentIndex = 0
+                        diffFilesList.forceActiveFocus()
+                      }
+                    } else {
+                      if (diffPackagesList.count > 0) {
+                        diffPackagesList.currentIndex = 0
+                        diffPackagesList.forceActiveFocus()
+                      }
+                    }
+                    event.accepted = true
                   }
 
                   Text {
@@ -3397,8 +3610,12 @@ Item {
               clip: true
 
               ListView {
+                id: diffFilesList
                 width: parent.width
                 spacing: 4
+                focus: true
+                currentIndex: 0
+                clip: true
                 model: {
                   var raw = (root.activeDiffData && root.activeDiffData.files) || []
                   if (!root.diffFilterQuery) return raw
@@ -3411,19 +3628,70 @@ Item {
                   return filtered
                 }
 
+                Keys.onUpPressed: function(event) {
+                  if (diffFilesList.currentIndex <= 0) {
+                    diffFilterInput.forceActiveFocus()
+                    event.accepted = true
+                  } else {
+                    diffFilesList.decrementCurrentIndex()
+                    event.accepted = true
+                  }
+                }
+                Keys.onDownPressed: function(event) {
+                  if (diffFilesList.currentIndex < diffFilesList.count - 1) {
+                    diffFilesList.incrementCurrentIndex()
+                    event.accepted = true
+                  }
+                }
+                Keys.onTabPressed: function(event) {
+                  diffModalCard.diffTab = "packages"
+                  event.accepted = true
+                }
+                Keys.onBacktabPressed: function(event) {
+                  diffModalCard.diffTab = "packages"
+                  event.accepted = true
+                }
+                Keys.onEscapePressed: function(event) {
+                  root.showDiffModal = false
+                  if (keyCatcher) keyCatcher.forceActiveFocus()
+                  event.accepted = true
+                }
+                Keys.onPressed: function(event) {
+                  if (event.key === Qt.Key_R || event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+                    var raw = diffFilesList.model
+                    if (raw && diffFilesList.currentIndex >= 0 && diffFilesList.currentIndex < raw.length) {
+                      var item = raw[diffFilesList.currentIndex]
+                      if (item && item.path) {
+                        root.confirmRestoreFile(root.activeDiffSnapshotId, item.path)
+                        event.accepted = true
+                        return
+                      }
+                    }
+                  } else if (event.key === Qt.Key_Slash || event.key === Qt.Key_F) {
+                    diffFilterInput.forceActiveFocus()
+                    diffFilterInput.selectAll()
+                    event.accepted = true
+                  }
+                }
+
                 delegate: Rectangle {
                   id: fileRowRect
                   width: parent.width
                   implicitHeight: 32
                   radius: 6
-                  color: fileRowMouse.containsMouse ? Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.05) : Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.02)
-                  border.color: fileRowMouse.containsMouse ? Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.1) : "transparent"
-                  border.width: 1
+                  property bool isCurrent: ListView.isCurrentItem && diffFilesList.activeFocus
+                  color: isCurrent ? Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.15) : (fileRowMouse.containsMouse ? Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.05) : Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.02))
+                  border.color: isCurrent ? Color.accent : (fileRowMouse.containsMouse ? Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.1) : "transparent")
+                  border.width: isCurrent ? 1.5 : 1
 
                   MouseArea {
                     id: fileRowMouse
                     anchors.fill: parent
                     hoverEnabled: true
+                    onClicked: {
+                      diffFilesList.currentIndex = index
+                      diffFilesList.forceActiveFocus()
+                    }
                   }
 
                   RowLayout {
@@ -3458,10 +3726,10 @@ Item {
                     Rectangle {
                       id: fileRestoreBtn
                       implicitHeight: 22
-                      implicitWidth: 80
+                      implicitWidth: resChipLayout.implicitWidth + 14
                       radius: 4
-                      color: fileRestoreBtnMouse.containsMouse ? Qt.rgba(0.06, 0.72, 0.51, 0.25) : Qt.rgba(0.06, 0.72, 0.51, 0.12)
-                      border.color: fileRestoreBtnMouse.containsMouse ? "#10B981" : Qt.rgba(0.06, 0.72, 0.51, 0.3)
+                      color: (fileRowRect.isCurrent || fileRestoreBtnMouse.containsMouse) ? Qt.rgba(0.06, 0.72, 0.51, 0.25) : Qt.rgba(0.06, 0.72, 0.51, 0.12)
+                      border.color: (fileRowRect.isCurrent || fileRestoreBtnMouse.containsMouse) ? "#10B981" : Qt.rgba(0.06, 0.72, 0.51, 0.3)
                       border.width: 1
 
                       MouseArea {
@@ -3473,6 +3741,7 @@ Item {
                       }
 
                       RowLayout {
+                        id: resChipLayout
                         anchors.centerIn: parent
                         spacing: 4
                         Text {
@@ -3485,6 +3754,21 @@ Item {
                           font.pixelSize: 10
                           font.weight: Font.Bold
                           color: "#10B981"
+                        }
+                        Rectangle {
+                          visible: fileRowRect.isCurrent
+                          implicitHeight: 14
+                          implicitWidth: rKeyTxt.implicitWidth + 4
+                          radius: 2
+                          color: Qt.rgba(0.06, 0.72, 0.51, 0.3)
+                          Text {
+                            id: rKeyTxt
+                            anchors.centerIn: parent
+                            text: "R"
+                            font.pixelSize: 8
+                            font.weight: Font.Bold
+                            color: "#10B981"
+                          }
                         }
                       }
                     }
@@ -3501,8 +3785,12 @@ Item {
               clip: true
 
               ListView {
+                id: diffPackagesList
                 width: parent.width
                 spacing: 6
+                focus: true
+                currentIndex: 0
+                clip: true
                 model: {
                   var raw = (root.activeDiffData && root.activeDiffData.packages) || []
                   if (!root.diffFilterQuery) return raw
@@ -3516,6 +3804,42 @@ Item {
                     }
                   }
                   return filtered
+                }
+
+                Keys.onUpPressed: function(event) {
+                  if (diffPackagesList.currentIndex <= 0) {
+                    diffFilterInput.forceActiveFocus()
+                    event.accepted = true
+                  } else {
+                    diffPackagesList.decrementCurrentIndex()
+                    event.accepted = true
+                  }
+                }
+                Keys.onDownPressed: function(event) {
+                  if (diffPackagesList.currentIndex < diffPackagesList.count - 1) {
+                    diffPackagesList.incrementCurrentIndex()
+                    event.accepted = true
+                  }
+                }
+                Keys.onTabPressed: function(event) {
+                  diffModalCard.diffTab = "files"
+                  event.accepted = true
+                }
+                Keys.onBacktabPressed: function(event) {
+                  diffModalCard.diffTab = "files"
+                  event.accepted = true
+                }
+                Keys.onEscapePressed: function(event) {
+                  root.showDiffModal = false
+                  if (keyCatcher) keyCatcher.forceActiveFocus()
+                  event.accepted = true
+                }
+                Keys.onPressed: function(event) {
+                  if (event.key === Qt.Key_Slash || event.key === Qt.Key_F) {
+                    diffFilterInput.forceActiveFocus()
+                    diffFilterInput.selectAll()
+                    event.accepted = true
+                  }
                 }
 
                 // Empty packages state
@@ -3541,9 +3865,23 @@ Item {
                   width: parent.width
                   implicitHeight: 34
                   radius: 6
-                  color: modelData.isCritical ? Qt.rgba(0.96, 0.62, 0.04, 0.08) : Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.03)
-                  border.color: modelData.isCritical ? Qt.rgba(0.96, 0.62, 0.04, 0.3) : Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.06)
-                  border.width: 1
+                  property bool isCurrent: ListView.isCurrentItem && diffPackagesList.activeFocus
+                  color: isCurrent
+                    ? Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.15)
+                    : (modelData.isCritical ? Qt.rgba(0.96, 0.62, 0.04, 0.08) : Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.03))
+                  border.color: isCurrent
+                    ? Color.accent
+                    : (modelData.isCritical ? Qt.rgba(0.96, 0.62, 0.04, 0.3) : Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.06))
+                  border.width: isCurrent ? 1.5 : 1
+
+                  MouseArea {
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    onClicked: {
+                      diffPackagesList.currentIndex = index
+                      diffPackagesList.forceActiveFocus()
+                    }
+                  }
 
                   RowLayout {
                     anchors.fill: parent
@@ -3641,10 +3979,16 @@ Item {
 
           Keys.onEscapePressed: {
             root.showRestoreModal = false
-            keyCatcher.forceActiveFocus()
+            if (keyCatcher) keyCatcher.forceActiveFocus()
           }
           Keys.onReturnPressed: root.executeRestore()
           Keys.onEnterPressed: root.executeRestore()
+          Keys.onPressed: function(event) {
+            if (event.key === Qt.Key_R) {
+              root.executeRestore()
+              event.accepted = true
+            }
+          }
 
           MouseArea { anchors.fill: parent }
 
@@ -3807,6 +4151,20 @@ Item {
                       color: "#ffffff"
                     }
                   }
+                  Rectangle {
+                    implicitHeight: 16
+                    implicitWidth: resKeyRBadge.implicitWidth + 6
+                    radius: 3
+                    color: Qt.rgba(0, 0, 0, 0.2)
+                    Text {
+                      id: resKeyRBadge
+                      anchors.centerIn: parent
+                      text: "R"
+                      font.pixelSize: 8
+                      font.weight: Font.Bold
+                      color: "#ffffff"
+                    }
+                  }
                 }
               }
             }
@@ -3840,10 +4198,16 @@ Item {
 
           Keys.onEscapePressed: {
             root.showDeleteModal = false
-            keyCatcher.forceActiveFocus()
+            if (keyCatcher) keyCatcher.forceActiveFocus()
           }
           Keys.onReturnPressed: root.executeDelete()
           Keys.onEnterPressed: root.executeDelete()
+          Keys.onPressed: function(event) {
+            if (event.key === Qt.Key_D || event.key === Qt.Key_X) {
+              root.executeDelete()
+              event.accepted = true
+            }
+          }
 
           MouseArea { anchors.fill: parent }
 
@@ -4006,6 +4370,20 @@ Item {
                       color: "#ffffff"
                     }
                   }
+                  Rectangle {
+                    implicitHeight: 16
+                    implicitWidth: delKeyDBadge.implicitWidth + 6
+                    radius: 3
+                    color: Qt.rgba(0, 0, 0, 0.25)
+                    Text {
+                      id: delKeyDBadge
+                      anchors.centerIn: parent
+                      text: "D"
+                      font.pixelSize: 8
+                      font.weight: Font.Bold
+                      color: "#ffffff"
+                    }
+                  }
                 }
               }
             }
@@ -4039,10 +4417,16 @@ Item {
 
           Keys.onEscapePressed: {
             root.showRestoreFileModal = false
-            keyCatcher.forceActiveFocus()
+            if (keyCatcher) keyCatcher.forceActiveFocus()
           }
           Keys.onReturnPressed: root.executeRestoreFile()
           Keys.onEnterPressed: root.executeRestoreFile()
+          Keys.onPressed: function(event) {
+            if (event.key === Qt.Key_R) {
+              root.executeRestoreFile()
+              event.accepted = true
+            }
+          }
 
           MouseArea { anchors.fill: parent }
 
@@ -4231,6 +4615,20 @@ Item {
                       color: "#ffffff"
                     }
                   }
+                  Rectangle {
+                    implicitHeight: 16
+                    implicitWidth: resFileKeyRBadge.implicitWidth + 6
+                    radius: 3
+                    color: Qt.rgba(0, 0, 0, 0.2)
+                    Text {
+                      id: resFileKeyRBadge
+                      anchors.centerIn: parent
+                      text: "R"
+                      font.pixelSize: 8
+                      font.weight: Font.Bold
+                      color: "#ffffff"
+                    }
+                  }
                 }
               }
             }
@@ -4267,7 +4665,7 @@ Item {
           Keys.onEscapePressed: {
             if (!root.isOptimizing) {
               root.showOptimizeModal = false
-              keyCatcher.forceActiveFocus()
+              if (keyCatcher) keyCatcher.forceActiveFocus()
             }
           }
           Keys.onReturnPressed: {
@@ -4278,6 +4676,14 @@ Item {
           Keys.onEnterPressed: {
             if (!root.isOptimizing && root.activeOptimizeData && root.activeOptimizeData.prunableCount > 0) {
               root.executeOptimize()
+            }
+          }
+          Keys.onPressed: function(event) {
+            if (!root.isOptimizing && (event.key === Qt.Key_O || event.key === Qt.Key_C)) {
+              if (root.activeOptimizeData && root.activeOptimizeData.prunableCount > 0) {
+                root.executeOptimize()
+                event.accepted = true
+              }
             }
           }
 
@@ -4494,9 +4900,42 @@ Item {
               clip: true
 
               ListView {
+                id: optimizeCandidatesList
                 width: parent.width
                 spacing: 4
+                focus: true
+                currentIndex: 0
+                clip: true
                 model: (root.activeOptimizeData && root.activeOptimizeData.prunableSnapshots) || []
+
+                Keys.onUpPressed: function(event) {
+                  if (optimizeCandidatesList.currentIndex > 0) {
+                    optimizeCandidatesList.decrementCurrentIndex()
+                    event.accepted = true
+                  }
+                }
+                Keys.onDownPressed: function(event) {
+                  if (optimizeCandidatesList.currentIndex < optimizeCandidatesList.count - 1) {
+                    optimizeCandidatesList.incrementCurrentIndex()
+                    event.accepted = true
+                  }
+                }
+                Keys.onEscapePressed: {
+                  if (!root.isOptimizing) {
+                    root.showOptimizeModal = false
+                    if (keyCatcher) keyCatcher.forceActiveFocus()
+                  }
+                }
+                Keys.onReturnPressed: {
+                  if (!root.isOptimizing && root.activeOptimizeData && root.activeOptimizeData.prunableCount > 0) {
+                    root.executeOptimize()
+                  }
+                }
+                Keys.onEnterPressed: {
+                  if (!root.isOptimizing && root.activeOptimizeData && root.activeOptimizeData.prunableCount > 0) {
+                    root.executeOptimize()
+                  }
+                }
 
                 // Empty state if no prunable
                 Item {
@@ -4521,8 +4960,22 @@ Item {
                   width: parent.width
                   implicitHeight: 30
                   radius: 4
-                  color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.02)
-                  border.color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.06)
+                  property bool isCurrent: ListView.isCurrentItem && optimizeCandidatesList.activeFocus
+                  color: isCurrent
+                    ? Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.15)
+                    : (optItemMouse.containsMouse ? Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.05) : Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.02))
+                  border.color: isCurrent ? Color.accent : Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.06)
+                  border.width: isCurrent ? 1.5 : 1
+
+                  MouseArea {
+                    id: optItemMouse
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    onClicked: {
+                      optimizeCandidatesList.currentIndex = index
+                      optimizeCandidatesList.forceActiveFocus()
+                    }
+                  }
 
                   RowLayout {
                     anchors.fill: parent
@@ -4666,6 +5119,21 @@ Item {
                       color: "#ffffff"
                     }
                   }
+                  Rectangle {
+                    visible: (root.activeOptimizeData && root.activeOptimizeData.prunableCount > 0 && !root.isOptimizing)
+                    implicitHeight: 16
+                    implicitWidth: optKeyOBadge.implicitWidth + 6
+                    radius: 3
+                    color: Qt.rgba(0, 0, 0, 0.2)
+                    Text {
+                      id: optKeyOBadge
+                      anchors.centerIn: parent
+                      text: "O"
+                      font.pixelSize: 8
+                      font.weight: Font.Bold
+                      color: "#ffffff"
+                    }
+                  }
                 }
               }
             }
@@ -4702,7 +5170,7 @@ Item {
           Keys.onEscapePressed: {
             if (!root.isSyncingBoot) {
               root.showBootModal = false
-              keyCatcher.forceActiveFocus()
+              if (keyCatcher) keyCatcher.forceActiveFocus()
             }
           }
           Keys.onReturnPressed: {
@@ -4713,6 +5181,12 @@ Item {
           Keys.onEnterPressed: {
             if (!root.isSyncingBoot) {
               root.executeBootSync()
+            }
+          }
+          Keys.onPressed: function(event) {
+            if (!root.isSyncingBoot && (event.key === Qt.Key_S || event.key === Qt.Key_B)) {
+              root.executeBootSync()
+              event.accepted = true
             }
           }
 
@@ -4948,13 +5422,59 @@ Item {
                 id: bootEntriesList
                 anchors.fill: parent
                 spacing: 4
+                focus: true
+                currentIndex: 0
+                clip: true
                 model: (root.activeBootData && root.activeBootData.entries) || []
+
+                Keys.onUpPressed: function(event) {
+                  if (bootEntriesList.currentIndex > 0) {
+                    bootEntriesList.decrementCurrentIndex()
+                    event.accepted = true
+                  }
+                }
+                Keys.onDownPressed: function(event) {
+                  if (bootEntriesList.currentIndex < bootEntriesList.count - 1) {
+                    bootEntriesList.incrementCurrentIndex()
+                    event.accepted = true
+                  }
+                }
+                Keys.onEscapePressed: {
+                  if (!root.isSyncingBoot) {
+                    root.showBootModal = false
+                    if (keyCatcher) keyCatcher.forceActiveFocus()
+                  }
+                }
+                Keys.onReturnPressed: {
+                  if (!root.isSyncingBoot) {
+                    root.executeBootSync()
+                  }
+                }
+                Keys.onEnterPressed: {
+                  if (!root.isSyncingBoot) {
+                    root.executeBootSync()
+                  }
+                }
 
                 delegate: Rectangle {
                   width: bootEntriesList.width
                   implicitHeight: 34
                   radius: 5
-                  color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, index % 2 === 0 ? 0.02 : 0.04)
+                  property bool isCurrent: ListView.isCurrentItem && bootEntriesList.activeFocus
+                  color: isCurrent
+                    ? Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.15)
+                    : Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, index % 2 === 0 ? 0.02 : 0.04)
+                  border.color: isCurrent ? Color.accent : "transparent"
+                  border.width: isCurrent ? 1.5 : 0
+
+                  MouseArea {
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    onClicked: {
+                      bootEntriesList.currentIndex = index
+                      bootEntriesList.forceActiveFocus()
+                    }
+                  }
 
                   RowLayout {
                     anchors.fill: parent
@@ -5141,6 +5661,21 @@ Item {
                       id: bootEnterTxt
                       anchors.centerIn: parent
                       text: "↵ Enter"
+                      font.pixelSize: 8
+                      font.weight: Font.Bold
+                      color: "#ffffff"
+                    }
+                  }
+                  Rectangle {
+                    visible: !root.isSyncingBoot
+                    implicitHeight: 16
+                    implicitWidth: bootKeySBadge.implicitWidth + 6
+                    radius: 3
+                    color: Qt.rgba(0, 0, 0, 0.2)
+                    Text {
+                      id: bootKeySBadge
+                      anchors.centerIn: parent
+                      text: "S"
                       font.pixelSize: 8
                       font.weight: Font.Bold
                       color: "#ffffff"
