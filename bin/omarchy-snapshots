@@ -12,9 +12,9 @@ import argparse
 
 CORE_SCRIPT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "omarchy-snapshots-core")
 
-def run_core(args_list):
+def run_core(args_list, input_data=None):
     cmd = [CORE_SCRIPT] + args_list
-    res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    res = subprocess.run(cmd, input=input_data, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
     try:
         return json.loads(res.stdout)
     except Exception:
@@ -107,12 +107,13 @@ def main():
         data = run_core(core_args)
         print(json.dumps(data, indent=2))
     elif args.command == "create":
-        core_args = ["create", "--desc", args.desc]
+        core_args = ["create", "--desc-stdin"]
         if args.important:
             core_args.append("--important")
         if args.mock:
             core_args.append("--mock")
-        res = run_core(core_args)
+        desc_input = (args.desc or "").strip()
+        res = run_core(core_args, input_data=desc_input + "\n")
         if res.get("ok"):
             print(f"\033[1;32m✓\033[0m {res.get('message', 'Snapshot created.')}")
         else:

@@ -564,5 +564,110 @@ class TestInteractiveDemoHUDPrecision(unittest.TestCase):
         finally:
             core.run_privileged = orig_run_priv
 
+    def test_checkpoint_description_stdin_isolation_in_hud(self):
+        """
+        Verify that SnapshotsHUD.qml never passes checkpoint descriptions as process arguments,
+        protecting descriptions from exposure in /proc/<pid>/cmdline to local users outside wheel.
+        """
+        hud_path = os.path.join(PROJECT_ROOT, "SnapshotsHUD.qml")
+        with open(hud_path, "r", encoding="utf-8") as f:
+            content = f.read()
+
+        # actionProcess must enable stdin and write payload on started
+        self.assertIn("stdinEnabled: true", content)
+        self.assertIn("property string stdinPayload: \"\"", content)
+        self.assertIn("write(stdinPayload)", content)
+
+        # submitCreateSnapshot must use --desc-stdin and NOT pass desc in command array
+        self.assertIn('var args = [coreScript, "create", "--desc-stdin"]', content)
+        self.assertIn('actionProcess.stdinPayload = (desc || "") + "\\n"', content)
+        self.assertNotIn('[coreScript, "create", "--desc", desc]', content)
+
+    def test_core_create_desc_stdin_parsing(self):
+        """
+        Verify that omarchy-snapshots-core correctly reads snapshot descriptions from stdin
+        when --desc-stdin is specified.
+        """
+        secret_desc = "Highly Confidential Checkpoint Alpha"
+        res = subprocess.run(
+            [CORE_SCRIPT, "create", "--desc-stdin", "--mock"],
+            input=secret_desc + "\n",
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True
+        )
+        self.assertEqual(res.returncode, 0)
+        data = json.loads(res.stdout)
+        self.assertTrue(data.get("ok"))
+        self.assertIn(secret_desc, data.get("message", ""))
+
+    def test_create_snapshot_avoids_argv_description_exposure(self):
+        """
+        Verify that create_snapshot NEVER passes the snapshot description in command arguments (argv),
+        ensuring /proc/<pid>/cmdline does not leak confidential snapshot descriptions.
+        """
+        recorded_cmds = []
+        recorded_inputs = []
+
+        def mock_run_cmd(cmd, timeout=5, input_data=None):
+            recorded_cmds.append(list(cmd))
+            recorded_inputs.append(input_data)
+            return 0, "42", ""
+
+        def mock_run_privileged(cmd, timeout=30, input_data=None):
+            recorded_cmds.append(list(cmd))
+            recorded_inputs.append(input_data)
+            return 0, "42", ""
+
+        orig_run_cmd = core.run_cmd
+        orig_run_priv = core.run_privileged
+        secret_desc = "Secret Database Backup Before Migration"
+
+        try:
+            core.run_cmd = mock_run_cmd
+            core.run_privileged = mock_run_privileged
+
+            # Force CLI fallback path by temporarily disabling dbus in create_snapshot
+            import sys
+            real_dbus = sys.modules.get("dbus")
+            sys.modules["dbus"] = None
+            try:
+                res = core.create_snapshot(secret_desc, config="root", mock=False)
+                self.assertTrue(res.get("ok"))
+                self.assertEqual(res.get("snapshotId"), 42)
+
+                # Verify that NO command in recorded_cmds contains the secret description in argv
+                for cmd in recorded_cmds:
+                    for arg in cmd:
+                        self.assertNotIn(secret_desc, arg, f"Secret description leaked in argv: {cmd}")
+                    self.assertNotIn("-d", cmd, f"-d flag found in command: {cmd}")
+
+                # Verify that the initial snapshot create command did not include description
+                self.assertEqual(recorded_cmds[0], ["snapper", "-c", "root", "create", "-c", "number", "-p"])
+
+                # Verify that the description was safely supplied via stdin (input_data)
+                self.assertTrue(any(inp and secret_desc in inp for inp in recorded_inputs), "Description must be piped via stdin")
+            finally:
+                if real_dbus:
+                    sys.modules["dbus"] = real_dbus
+                else:
+                    sys.modules.pop("dbus", None)
+        finally:
+            core.run_cmd = orig_run_cmd
+            core.run_privileged = orig_run_priv
+
+    def test_cli_create_pipes_description_over_stdin(self):
+        """
+        Verify that the user-facing CLI binary omarchy-snapshots pipes description
+        via stdin to core, rather than passing it via process arguments.
+        """
+        cli_path = os.path.join(PROJECT_ROOT, "bin", "omarchy-snapshots")
+        with open(cli_path, "r", encoding="utf-8") as f:
+            content = f.read()
+
+        self.assertIn('core_args = ["create", "--desc-stdin"]', content)
+        self.assertIn('run_core(core_args, input_data=desc_input + "\\n")', content)
+        self.assertNotIn('core_args = ["create", "--desc", args.desc]', content)
+
 if __name__ == "__main__":
     unittest.main()

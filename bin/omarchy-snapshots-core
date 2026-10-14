@@ -17,18 +17,18 @@ import glob
 import shlex
 from datetime import datetime, timezone
 
-def run_cmd(cmd, timeout=5):
+def run_cmd(cmd, timeout=5, input_data=None):
     try:
-        res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=timeout)
+        res = subprocess.run(cmd, input=input_data, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=timeout)
         return res.returncode, res.stdout.strip(), res.stderr.strip()
     except Exception as e:
         return 1, "", str(e)
 
-def run_privileged(cmd_args, timeout=30):
+def run_privileged(cmd_args, timeout=30, input_data=None):
     """Run privileged command using pkexec if not root, or directly if already root."""
     if os.geteuid() == 0:
-        return run_cmd(cmd_args, timeout=timeout)
-    return run_cmd(["pkexec"] + cmd_args, timeout=timeout)
+        return run_cmd(cmd_args, timeout=timeout, input_data=input_data)
+    return run_cmd(["pkexec"] + cmd_args, timeout=timeout, input_data=input_data)
 
 def format_bytes(bytes_num):
     if bytes_num is None or bytes_num < 0:
@@ -733,11 +733,37 @@ def get_live_status():
     }
 
 def create_snapshot(description, config="root", important=False, mock=False):
+    """
+    Creates a snapshot securely without exposing the checkpoint description
+    to unprivileged users via /proc/<pid>/cmdline.
+    
+    Primary: Snapper D-Bus IPC directly communicating with snapperd (zero subprocesses).
+    Fallback: Snapper CLI create invoked WITHOUT description arguments, followed by
+              setting the metadata via D-Bus SetSnapshot or piping description over stdin.
+    """
     desc = (description or "").strip() or f"Manual checkpoint {datetime.now().strftime('%Y-%m-%d %H:%M')}"
     if mock:
         return {"ok": True, "snapshotId": 20, "message": f"[Mock] Snapshot '{desc}' created successfully."}
 
-    cmd = ["snapper", "-c", config, "create", "-c", "number", "-p", "-d", desc]
+    # 1. Primary: Snapper D-Bus IPC (zero subprocesses, no /proc/<pid>/cmdline exposure)
+    try:
+        import dbus
+        bus = dbus.SystemBus()
+        snapper_obj = bus.get_object('org.opensuse.Snapper', '/org/opensuse/Snapper')
+        iface = dbus.Interface(snapper_obj, 'org.opensuse.Snapper')
+        userdata = {'important': 'yes'} if important else {}
+        snap_id = int(iface.CreateSingleSnapshot(config, desc, "number", userdata))
+        return {
+            "ok": True,
+            "snapshotId": snap_id,
+            "message": f"Snapshot #{snap_id} ('{desc}') created successfully."
+        }
+    except Exception:
+        # Fallback to secure CLI path if D-Bus is unreachable or lacks permissions
+        pass
+
+    # 2. Fallback: Snapper CLI without passing description in argv (argv is world-readable in /proc)
+    cmd = ["snapper", "-c", config, "create", "-c", "number", "-p"]
     if important:
         cmd.extend(["-u", "important=yes"])
 
@@ -747,11 +773,43 @@ def create_snapshot(description, config="root", important=False, mock=False):
         rc, out, err = run_privileged(cmd)
 
     if rc == 0:
-        snap_id = out.strip()
-        msg = f"Snapshot #{snap_id} ('{desc}') created successfully." if snap_id.isdigit() else f"Snapshot '{desc}' created successfully."
+        snap_id_str = out.strip()
+        snap_id = int(snap_id_str) if snap_id_str.isdigit() else None
+        if snap_id is not None and desc:
+            # Safely set description without exposing it in cmdline:
+            set_ok = False
+            try:
+                import dbus
+                bus = dbus.SystemBus()
+                snapper_obj = bus.get_object('org.opensuse.Snapper', '/org/opensuse/Snapper')
+                iface = dbus.Interface(snapper_obj, 'org.opensuse.Snapper')
+                userdata = {'important': 'yes'} if important else {}
+                iface.SetSnapshot(config, snap_id, desc, "number", userdata)
+                set_ok = True
+            except Exception:
+                pass
+
+            if not set_ok:
+                # Update info.xml via stdin pipe to python script running privileged
+                update_py = (
+                    "import sys, os, xml.etree.ElementTree as ET\n"
+                    "desc_val = sys.stdin.readline().strip()\n"
+                    "info_path = f'/.snapshots/{sys.argv[1]}/info.xml'\n"
+                    "if os.path.exists(info_path):\n"
+                    "    tree = ET.parse(info_path)\n"
+                    "    root = tree.getroot()\n"
+                    "    desc_elem = root.find('description')\n"
+                    "    if desc_elem is None:\n"
+                    "        desc_elem = ET.SubElement(root, 'description')\n"
+                    "    desc_elem.text = desc_val\n"
+                    "    tree.write(info_path, encoding='utf-8', xml_declaration=True)\n"
+                )
+                run_privileged(["python3", "-c", update_py, str(snap_id)], input_data=desc + "\n")
+
+        msg = f"Snapshot #{snap_id} ('{desc}') created successfully." if snap_id else f"Snapshot '{desc}' created successfully."
         return {
             "ok": True,
-            "snapshotId": int(snap_id) if snap_id.isdigit() else None,
+            "snapshotId": snap_id,
             "message": msg
         }
     return {"ok": False, "error": err or "Failed to create snapshot."}
@@ -1216,6 +1274,7 @@ def main():
     parser.add_argument("--mock", action="store_true", help="Output mock data for testing or preview")
     parser.add_argument("--config", default="root", help="Snapper config name (default: root)")
     parser.add_argument("--desc", default="", help="Description for snapshot creation")
+    parser.add_argument("--desc-stdin", action="store_true", help="Read description securely from stdin to avoid procfs cmdline exposure")
     parser.add_argument("--id", type=int, help="Snapshot ID for operations")
     parser.add_argument("--path", default="", help="File path for single-file rollback")
     parser.add_argument("--important", action="store_true", help="Mark snapshot as important (pinned)")
@@ -1229,7 +1288,20 @@ def main():
         res = get_mock_status() if args.mock else get_live_status()
         print(json.dumps(res, indent=2))
     elif args.command == "create":
-        desc = args.desc.strip() or f"Manual checkpoint {datetime.now().strftime('%Y-%m-%d %H:%M')}"
+        if args.desc_stdin:
+            try:
+                desc = sys.stdin.readline().strip()
+            except Exception:
+                desc = ""
+        elif args.desc:
+            desc = args.desc.strip()
+        elif not sys.stdin.isatty():
+            try:
+                desc = sys.stdin.readline().strip()
+            except Exception:
+                desc = ""
+        else:
+            desc = ""
         res = create_snapshot(desc, config=args.config, important=args.important, mock=args.mock)
         print(json.dumps(res, indent=2))
         sys.exit(0 if res.get("ok") else 1)

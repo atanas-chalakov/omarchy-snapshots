@@ -299,12 +299,13 @@ Item {
       return
     }
 
-    notify("Creating checkpoint '" + desc + "'...")
+    notify("Creating checkpoint" + (desc ? " '" + desc + "'" : "") + "...")
 
-    var args = [coreScript, "create", "--desc", desc]
+    var args = [coreScript, "create", "--desc-stdin"]
     if (newSnapshotImportant) args.push("--important")
 
     if (actionProcess.running) actionProcess.running = false
+    actionProcess.stdinPayload = (desc || "") + "\n"
     actionProcess.command = args
     actionProcess.running = true
   }
@@ -612,6 +613,14 @@ Item {
   Process {
     id: actionProcess
     property string stderrOutput: ""
+    property string stdinPayload: ""
+    stdinEnabled: true
+    onStarted: {
+      if (stdinPayload.length > 0) {
+        write(stdinPayload)
+        stdinPayload = ""
+      }
+    }
     stdout: StdioCollector {
       waitForEnd: true
       onStreamFinished: {
@@ -638,6 +647,7 @@ Item {
       }
     }
     onExited: function(exitCode) {
+      actionProcess.stdinPayload = ""
       if (exitCode !== 0 && actionProcess.stderrOutput.length > 0) {
         root.notify("Error: " + actionProcess.stderrOutput)
       }
