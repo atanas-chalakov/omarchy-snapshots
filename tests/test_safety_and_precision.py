@@ -533,6 +533,36 @@ class TestInteractiveDemoHUDPrecision(unittest.TestCase):
         self.assertIn("if (!activeDeleteSnapshot) return", content)
         self.assertIn("if (!activeRestoreFilePath || !activeRestoreFileSnapshotId) return", content)
 
+    def test_authorize_access_security_and_wheel_isolation(self):
+        """
+        Verify that authorize_access restricts /.snapshots permissions to root:wheel (0750)
+        and NEVER exposes readable snapshot contents or metadata via broad a+rx (0755).
+        """
+        recorded_cmds = []
+
+        def mock_run_privileged(cmd, timeout=30):
+            recorded_cmds.append(cmd)
+            return 0, "ok", ""
+
+        orig_run_priv = core.run_privileged
+        try:
+            core.run_privileged = mock_run_privileged
+            res = core.authorize_access(config="root")
+            self.assertTrue(res["ok"])
+            self.assertIn("0750", res["message"])
+
+            # Verify the 3 commands
+            self.assertEqual(len(recorded_cmds), 3)
+            self.assertEqual(recorded_cmds[0], ["snapper", "-c", "root", "set-config", "ALLOW_GROUPS=wheel"])
+            self.assertEqual(recorded_cmds[1], ["chown", ":wheel", "/.snapshots"])
+            self.assertEqual(recorded_cmds[2], ["chmod", "750", "/.snapshots"])
+
+            # Verify NO command uses a+rx or 755
+            for cmd in recorded_cmds:
+                self.assertNotIn("a+rx", cmd)
+                self.assertNotIn("755", cmd)
+        finally:
+            core.run_privileged = orig_run_priv
 
 if __name__ == "__main__":
     unittest.main()

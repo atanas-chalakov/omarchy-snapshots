@@ -61,7 +61,7 @@ Omarchy configures Btrfs and Snapper out-of-the-box, taking automatic snapshots 
 - **Time Machine File Recovery**:
   - Click **[Browse]** to open `/.snapshots/<id>/snapshot/` in your file manager to restore individual files without rebooting.
 - **One-Click Authorization**:
-  - Built-in `[Authorize Access]` banner allows wheel users to configure passwordless desktop access via `pkexec` in seconds.
+  - Built-in `[Authorize Access]` banner allows wheel users to configure passwordless desktop access via `pkexec` in seconds (securing `/.snapshots` with mode `0750` restricted to `root:wheel`).
 - **Full Keyboard Navigation & Shortcuts**:
   - Complete keyboard control: browse snapshots, create checkpoints, inspect diffs, and restore with Vim-style and standard desktop hotkeys (`J/K`, `C`, `D`, `B`, `P`, `R`, `X`, `F`, `G`, `Esc`).
 
